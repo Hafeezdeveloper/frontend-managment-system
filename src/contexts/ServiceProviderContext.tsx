@@ -52,8 +52,12 @@ export const ServiceProviderProvider: React.FC<{
       if (savedServiceProvider) {
         try {
           const parsed = JSON.parse(savedServiceProvider);
-          if (parsed && parsed.id) { // Basic validation
+          // Validate that we have essential fields (id or _id, email, username)
+          if (parsed && (parsed.id || parsed._id) && parsed.email && parsed.username) {
             setCurrentServiceProviderState(parsed);
+          } else {
+            console.warn("Invalid service provider data in localStorage");
+            localStorage.removeItem("currentServiceProvider");
           }
         } catch (error) {
           console.error("Failed to parse service provider:", error);
@@ -95,6 +99,7 @@ export const ServiceProviderProvider: React.FC<{
         setCurrentServiceProvider,
         logout,
         isAuthenticated,
+        isLoading,
       }}
     >
       {children}

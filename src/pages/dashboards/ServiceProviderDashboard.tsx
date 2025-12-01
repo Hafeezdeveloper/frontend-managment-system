@@ -54,7 +54,7 @@ import { toast } from "sonner";
 
 const ServiceProviderDashboard = () => {
   const navigate = useNavigate();
-  const { currentServiceProvider, logout } = useServiceProvider();
+  const { currentServiceProvider, logout, isLoading } = useServiceProvider();
   const {
     getServiceProviderBookings,
     getServiceProviderReviews,
@@ -68,22 +68,33 @@ const ServiceProviderDashboard = () => {
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Check authentication
+  // Check authentication - wait for loading to complete
   useEffect(() => {
-    console.log("acurrentServiceProvidercurrentServiceProvider" ,currentServiceProvider)
-    if (!currentServiceProvider) {
+    if (!isLoading && !currentServiceProvider) {
       console.log("No service provider found, redirecting to auth");
       navigate("/service-provider/auth");
     }
-  }, [currentServiceProvider, navigate]);
+  }, [currentServiceProvider, isLoading, navigate]);
 
-  // If not authenticated, show loading
-  if (!currentServiceProvider) {
+  // Show loading while context is loading
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If not authenticated after loading, show loading (will redirect)
+  if (!currentServiceProvider) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Redirecting...</p>
         </div>
       </div>
     );
@@ -522,10 +533,12 @@ const ServiceProviderDashboard = () => {
                           <Phone className="w-4 h-4 text-gray-500" />
                           <span>{currentServiceProvider.phone}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-gray-500" />
-                          <span>{currentServiceProvider.serviceArea}</span>
-                        </div>
+                        {currentServiceProvider.serviceArea && (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-gray-500" />
+                            <span>{currentServiceProvider.serviceArea}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -538,41 +551,51 @@ const ServiceProviderDashboard = () => {
                           </span>
                           <p>{currentServiceProvider.serviceCategory}</p>
                         </div>
-                        <div>
-                          <span className="text-sm font-medium text-gray-500">
-                            Experience:
-                          </span>
-                          <p>{currentServiceProvider.experience}</p>
-                        </div>
-                        <div>
-                          <span className="text-sm font-medium text-gray-500">
-                            Availability:
-                          </span>
-                          <p>{currentServiceProvider.availability}</p>
-                        </div>
+                        {currentServiceProvider.experience && (
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">
+                              Experience:
+                            </span>
+                            <p>{currentServiceProvider.experience}</p>
+                          </div>
+                        )}
+                        {currentServiceProvider.availability && (
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">
+                              Availability:
+                            </span>
+                            <p>{currentServiceProvider.availability}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
 
                   <Separator />
 
-                  <div>
-                    <h3 className="font-semibold mb-2">About</h3>
-                    <p className="text-gray-700">
-                      {currentServiceProvider.shortIntro}
-                    </p>
-                  </div>
+                  {currentServiceProvider.shortIntro && (
+                    <div>
+                      <h3 className="font-semibold mb-2">About</h3>
+                      <p className="text-gray-700">
+                        {currentServiceProvider.shortIntro}
+                      </p>
+                    </div>
+                  )}
 
                   <div>
                     <h3 className="font-semibold mb-2">Keywords</h3>
                     <div className="flex flex-wrap gap-2">
-                      {currentServiceProvider?.keywords
-                        .split(",")
-                        .map((keyword, index) => (
-                          <Badge key={index} variant="outline">
-                            {keyword.trim()}
-                          </Badge>
-                        ))}
+                      {currentServiceProvider?.keywords && currentServiceProvider.keywords.trim() ? (
+                        currentServiceProvider.keywords
+                          .split(",")
+                          .map((keyword, index) => (
+                            <Badge key={index} variant="outline">
+                              {keyword.trim()}
+                            </Badge>
+                          ))
+                      ) : (
+                        <p className="text-sm text-gray-500">No keywords available</p>
+                      )}
                     </div>
                   </div>
                 </CardContent>

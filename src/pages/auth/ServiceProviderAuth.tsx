@@ -102,35 +102,60 @@ const ServiceProviderAuth = () => {
 
     try {
       // 1. First authenticate with backend API
-      const response = await axios.post(`${baseUrl}/auth/service-provider/login`, {
+      const response = await axios.post(`${baseUrl}/v1/admin/service-provider/login`, {
         email: loginData.email,
         password: loginData.password
       });
-      if (response.data.user.status === "PENDING") {
-        setIsLoading(false);
-        toast.error(`Your account is not active or pending approval !`);
-        return
-      }
+      
       console.log("Login response:", response.data);
-      if (response?.data?.token && response?.data?.user) {
+      
+      // Backend returns status 200 with successHandler format:
+      // {
+      //   "success": true,
+      //   "message": "Login successful",
+      //   "data": {
+      //     "token": "...",
+      //     "user": {...}
+      //   },
+      //   "status": 200
+      // }
+      
+      if (response?.data?.data?.token && response?.data?.data?.user) {
+        const token = response.data.data.token;
+        const userData = response.data.data.user;
+        
         // 2. Store the authentication token
-        Cookies.set('authToken', response.data.token, {
-          expires: 1,
+        Cookies.set('authToken', token, {
+          expires: 7, // 7 days as per backend JWT expiry
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'strict'
         });
-        console.log(response.data.user)
+        
         // 3. Create service provider object from API response
-        const authenticatedResident = authenticateServiceProvider(
-          response?.data?.user?.username,
-          loginData.password,
-        );
+        // Backend returns: _id, username, email, name, status, serviceCategory, phone
+        // Convert _id to id and add default values for missing fields
         const serviceProvider = {
-          ...response.data.user,
-          // Map any fields that might be named differently
-          username: response.data.user.username || loginData.email,
-          email: response.data.user.email || loginData.email,
-          status: response.data.user.status === "ACTIVE" ? "Active" : response.data.user.status
+          ...userData,
+          // Convert MongoDB _id string to numeric id (simple hash)
+          id: userData._id 
+            ? (typeof userData._id === 'string' 
+                ? userData._id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 1000000
+                : Number(userData._id) || 1)
+            : 1,
+          username: userData.username || loginData.email,
+          email: userData.email || loginData.email,
+          // Backend status is "approved" for active users
+          status: userData.status === "approved" ? "Active" : userData.status,
+          // Add default values for fields that might be missing
+          keywords: userData.keywords || "",
+          shortIntro: userData.shortIntro || "",
+          experience: userData.experience || "",
+          availability: userData.availability || "",
+          serviceArea: userData.serviceArea || "",
+          phone: userData.phone || "",
+          rating: userData.rating || 0,
+          totalReviews: userData.totalReviews || 0,
+          completedJobs: userData.completedJobs || 0,
         };
 
         // 4. Set the service provider in context
@@ -138,14 +163,25 @@ const ServiceProviderAuth = () => {
         setCurrentServiceProvider(serviceProvider);
 
         // 5. Navigate to dashboard
-        toast.success(`Welcome back !`);
+        toast.success(response.data.message || "Welcome back!");
         navigate("/service-provider/dashboard");
+      } else {
+        // If response structure is unexpected
+        console.error("Unexpected response structure:", response.data);
+        setError("Invalid response from server");
+        toast.error("Invalid response from server");
       }
     } catch (error: any) {
       console.error("Login error:", error);
+      
+      // Backend error responses:
+      // 401: "Email or password is incorrect"
+      // 403: "Your account is not active or pending approval"
+      // 400: Other errors
       const errorMessage = error?.response?.data?.message ||
         error?.message ||
         "Login failed. Please try again.";
+      
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -285,7 +321,7 @@ const ServiceProviderAuth = () => {
 
       // Make the request with JSON payload
       const response = await axios.post(
-        `${baseUrl}/auth/service-provider/register`,
+        `${baseUrl}/v1/admin/service-provider/register`,
         registrationData,
         {
           headers: {
@@ -293,9 +329,8 @@ const ServiceProviderAuth = () => {
           },
         }
       );
-      console.log("adawd", response)
-      if (response.data.message == "Registration successful"
-      ) {
+      console.log("Service provider register response:", response);
+      if (response.status === 201 && response?.data?.message === "Service Provider registered successfully") {
         // Reset forms and switch to login tab
         setActiveTab("login");
         setCurrentStep(1);
