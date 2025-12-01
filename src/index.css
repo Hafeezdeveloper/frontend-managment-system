@@ -1,0 +1,262 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700;800&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display;
+  }
+}
+
+@layer components {
+  /* Society Management Custom Components */
+  .society-card {
+    @apply bg-white/95 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300;
+  }
+
+  .society-gradient-text {
+    @apply bg-gradient-to-r from-society-500 to-success-500 bg-clip-text text-transparent;
+  }
+
+  .glass-effect {
+    @apply bg-white/10 backdrop-blur-md border border-white/20;
+  }
+
+  .floating-card {
+    @apply transform hover:scale-105 transition-transform duration-300 ease-out;
+  }
+
+  .role-card-admin {
+    @apply bg-gradient-to-br from-red-500 to-red-600 text-white shadow-admin;
+  }
+
+  .role-card-resident {
+    @apply bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-resident;
+  }
+
+  .role-card-service {
+    @apply bg-gradient-to-br from-green-500 to-green-600 text-white shadow-service;
+  }
+
+  .role-card-employee {
+    @apply bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-employee;
+  }
+}
+
+@layer utilities {
+  /* Custom animations for society management */
+  .animate-fade-in-delay-1 {
+    animation: fade-in 0.5s ease-out 0.1s both;
+  }
+
+  .animate-fade-in-delay-2 {
+    animation: fade-in 0.5s ease-out 0.2s both;
+  }
+
+  .animate-fade-in-delay-3 {
+    animation: fade-in 0.5s ease-out 0.3s both;
+  }
+
+  .animate-fade-in-delay-4 {
+    animation: fade-in 0.5s ease-out 0.4s both;
+  }
+
+  /* Smooth scrolling */
+  .smooth-scroll {
+    scroll-behavior: smooth;
+  }
+
+  /* Custom focus states for accessibility */
+  .focus-society {
+    @apply focus:outline-none focus:ring-2 focus:ring-society-500 focus:ring-offset-2;
+  }
+
+  /* Loading states */
+  .loading-dots::after {
+    content: "";
+    animation: loading-dots 1.5s infinite;
+  }
+
+  @keyframes loading-dots {
+    0%,
+    20% {
+      content: "";
+    }
+    40% {
+      content: ".";
+    }
+    60% {
+      content: "..";
+    }
+    80%,
+    100% {
+      content: "...";
+    }
+  }
+
+  /* Gradient text utilities */
+  .gradient-text-admin {
+    @apply bg-gradient-to-r from-red-500 to-red-600 bg-clip-text text-transparent;
+  }
+
+  .gradient-text-resident {
+    @apply bg-gradient-to-r from-blue-500 to-blue-600 bg-clip-text text-transparent;
+  }
+
+  .gradient-text-service {
+    @apply bg-gradient-to-r from-green-500 to-green-600 bg-clip-text text-transparent;
+  }
+
+  .gradient-text-employee {
+    @apply bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent;
+  }
+}
+
+/* Society Management specific styles */
+.society-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+@media (min-width: 640px) {
+  .society-container {
+    padding: 0 2rem;
+  }
+}
+
+/* Enhanced button hover effects */
+.btn-society {
+  @apply relative overflow-hidden transition-all duration-300;
+}
+
+.btn-society::before {
+  content: "";
+  @apply absolute inset-0 bg-white/20 transform scale-x-0 transition-transform duration-300 origin-left;
+}
+
+.btn-society:hover::before {
+  @apply scale-x-100;
+}
+
+/* Custom scrollbar for webkit browsers */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-gray-100 rounded-full;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-society-400 rounded-full hover:bg-society-500;
+}
+
+/* Print styles for reports */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-page-break {
+    page-break-before: always;
+  }
+}
