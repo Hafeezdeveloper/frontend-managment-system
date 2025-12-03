@@ -79,7 +79,7 @@ const AdminServiceProviders = () => {
   // Filter and search logic
 
   let findProvider = async () => {
-    const response = await axios.get(`${baseUrl}/service-providers`, {
+    const response = await axios.get(`${baseUrl}/v1/admin/service-providers/all`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -88,7 +88,7 @@ const AdminServiceProviders = () => {
 
     console.log("API Response:", response.data);
 
-    setProd(response.data.serviceProviders)
+    setProd(response.data.data.serviceProviders)
   }
 
   console.log("response", prod)
@@ -182,15 +182,40 @@ const AdminServiceProviders = () => {
   };
 
   const openDetails = (provider: any) => {
-    setSelectedProvider(provider);
-    setShowDetails(true);
+    // If dialog is open, close it first
+    if (showDetails) {
+      setShowDetails(false);
+      setSelectedProvider(null);
+      // Wait for dialog to unmount, then open with new provider
+      setTimeout(() => {
+        setSelectedProvider(provider);
+        setShowDetails(true);
+      }, 150);
+    } else {
+      // Set provider first (this will mount the Dialog), then open it
+      setSelectedProvider(provider);
+      // Small delay to ensure Dialog is mounted
+      setTimeout(() => {
+        setShowDetails(true);
+      }, 10);
+    }
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    setShowDetails(open);
+    if (!open) {
+      // Reset selected provider after dialog closes
+      setTimeout(() => {
+        setSelectedProvider(null);
+      }, 200);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <Toaster position={"top-right"} />
+        <Toaster />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
@@ -401,13 +426,14 @@ const AdminServiceProviders = () => {
       </main>
 
       {/* Details Dialog */}
-      <Dialog open={showDetails} onOpenChange={setShowDetails}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      {selectedProvider && (
+        <Dialog open={showDetails} onOpenChange={handleDialogClose}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <div className="absolute right-4 top-4">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowDetails(false)}
+              onClick={() => handleDialogClose(false)}
               className="rounded-full h-8 w-8 p-0"
             >
               <XCircle className="h-4 w-4" />
@@ -659,7 +685,7 @@ const AdminServiceProviders = () => {
                   <Button
                     onClick={() => {
                       handleStatusChange(selectedProvider.id, "Active");
-                      setShowDetails(false);
+                      handleDialogClose(false);
                     }}
                     className="flex-1 bg-green-600 hover:bg-green-700"
                   >
@@ -670,7 +696,7 @@ const AdminServiceProviders = () => {
                     variant="destructive"
                     onClick={() => {
                       handleStatusChange(selectedProvider.id, "Rejected");
-                      setShowDetails(false);
+                      handleDialogClose(false);
                     }}
                     className="flex-1"
                   >
@@ -683,6 +709,7 @@ const AdminServiceProviders = () => {
           )}
         </DialogContent>
       </Dialog>
+      )}
     </div>
   );
 };
