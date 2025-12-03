@@ -106,9 +106,9 @@ const ServiceProviderAuth = () => {
         email: loginData.email,
         password: loginData.password
       });
-      
+
       console.log("Login response:", response.data);
-      
+
       // Backend returns status 200 with successHandler format:
       // {
       //   "success": true,
@@ -119,28 +119,28 @@ const ServiceProviderAuth = () => {
       //   },
       //   "status": 200
       // }
-      
+
       if (response?.data?.data?.token && response?.data?.data?.user) {
         const token = response.data.data.token;
         const userData = response.data.data.user;
-        
+
         // 2. Store the authentication token
         Cookies.set('authToken', token, {
           expires: 7, // 7 days as per backend JWT expiry
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'strict'
         });
-        
+
         // 3. Create service provider object from API response
         // Backend returns: _id, username, email, name, status, serviceCategory, phone
         // Convert _id to id and add default values for missing fields
         const serviceProvider = {
           ...userData,
           // Convert MongoDB _id string to numeric id (simple hash)
-          id: userData._id 
-            ? (typeof userData._id === 'string' 
-                ? userData._id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 1000000
-                : Number(userData._id) || 1)
+          id: userData._id
+            ? (typeof userData._id === 'string'
+              ? userData._id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 1000000
+              : Number(userData._id) || 1)
             : 1,
           username: userData.username || loginData.email,
           email: userData.email || loginData.email,
@@ -173,7 +173,7 @@ const ServiceProviderAuth = () => {
       }
     } catch (error: any) {
       console.error("Login error:", error);
-      
+
       // Backend error responses:
       // 401: "Email or password is incorrect"
       // 403: "Your account is not active or pending approval"
@@ -181,7 +181,7 @@ const ServiceProviderAuth = () => {
       const errorMessage = error?.response?.data?.message ||
         error?.message ||
         "Login failed. Please try again.";
-      
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -267,7 +267,7 @@ const ServiceProviderAuth = () => {
     setError("");
 
     try {
-     
+
       // Validate required fields in step 3
       if (
         !step3Form.experience.trim() ||
@@ -516,7 +516,7 @@ const ServiceProviderAuth = () => {
             />
           </div>
 
-          
+
 
           <div className="space-y-2">
             <Label htmlFor="additional-notes">Additional Notes</Label>

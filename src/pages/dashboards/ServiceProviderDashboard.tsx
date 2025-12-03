@@ -534,10 +534,10 @@ const ServiceProviderDashboard = () => {
                           <span>{currentServiceProvider.phone}</span>
                         </div>
                         {currentServiceProvider.serviceArea && (
-                          <div className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-gray-500" />
-                            <span>{currentServiceProvider.serviceArea}</span>
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-gray-500" />
+                          <span>{currentServiceProvider.serviceArea}</span>
+                        </div>
                         )}
                       </div>
                     </div>
@@ -552,20 +552,20 @@ const ServiceProviderDashboard = () => {
                           <p>{currentServiceProvider.serviceCategory}</p>
                         </div>
                         {currentServiceProvider.experience && (
-                          <div>
-                            <span className="text-sm font-medium text-gray-500">
-                              Experience:
-                            </span>
-                            <p>{currentServiceProvider.experience}</p>
-                          </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">
+                            Experience:
+                          </span>
+                          <p>{currentServiceProvider.experience}</p>
+                        </div>
                         )}
                         {currentServiceProvider.availability && (
-                          <div>
-                            <span className="text-sm font-medium text-gray-500">
-                              Availability:
-                            </span>
-                            <p>{currentServiceProvider.availability}</p>
-                          </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">
+                            Availability:
+                          </span>
+                          <p>{currentServiceProvider.availability}</p>
+                        </div>
                         )}
                       </div>
                     </div>
@@ -574,12 +574,12 @@ const ServiceProviderDashboard = () => {
                   <Separator />
 
                   {currentServiceProvider.shortIntro && (
-                    <div>
-                      <h3 className="font-semibold mb-2">About</h3>
-                      <p className="text-gray-700">
-                        {currentServiceProvider.shortIntro}
-                      </p>
-                    </div>
+                  <div>
+                    <h3 className="font-semibold mb-2">About</h3>
+                    <p className="text-gray-700">
+                      {currentServiceProvider.shortIntro}
+                    </p>
+                  </div>
                   )}
 
                   <div>
@@ -587,11 +587,11 @@ const ServiceProviderDashboard = () => {
                     <div className="flex flex-wrap gap-2">
                       {currentServiceProvider?.keywords && currentServiceProvider.keywords.trim() ? (
                         currentServiceProvider.keywords
-                          .split(",")
-                          .map((keyword, index) => (
-                            <Badge key={index} variant="outline">
-                              {keyword.trim()}
-                            </Badge>
+                        .split(",")
+                        .map((keyword, index) => (
+                          <Badge key={index} variant="outline">
+                            {keyword.trim()}
+                          </Badge>
                           ))
                       ) : (
                         <p className="text-sm text-gray-500">No keywords available</p>

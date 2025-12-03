@@ -156,7 +156,7 @@ const ResidentAuth = () => {
         setIsLoading(false);
         return;
       }
-      let response: any = await axios.post<any>(`${baseUrl}/auth/resident/login`, loginData)
+      let response: any = await axios.post<any>(`${baseUrl}/v1/admin/resident/login`, loginData)
 
       if (response?.data?.token) {
         // Always allow login regardless of previous sessions
@@ -224,17 +224,25 @@ const ResidentAuth = () => {
   };
 
   const validateStep2 = () => {
-    const idFieldMap = {
+    const idFieldMap: Record<string, string> = {
       CNIC: "cnicNumber",
-      Passport: "passportNumber",
-      "Driver License": "driverLicenseNumber",
+      PASSPORT: "passportNumber",
+      DRIVER_LICENSE: "driverLicenseNumber",
     };
 
     const requiredIdField = idFieldMap[signupData.idDocumentType];
+    if (!requiredIdField) {
+      setError("Please select an ID document type.");
+      return false;
+    }
+
     const idValue = signupData[requiredIdField as keyof typeof signupData];
 
     if (!idValue) {
-      setError(`Please enter your ${signupData.idDocumentType} number.`);
+      const documentTypeName = signupData.idDocumentType === "CNIC" ? "CNIC" 
+        : signupData.idDocumentType === "PASSPORT" ? "Passport" 
+        : "Driver License";
+      setError(`Please enter your ${documentTypeName} number.`);
       return false;
     }
 
@@ -267,65 +275,146 @@ const ResidentAuth = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("AWd")
     setIsLoading(true);
     setError("");
     setSuccess("");
 
     try {
-      if (currentStep == 2) {
+      // Step 1: Validate and move to step 2
+      if (currentStep === 1) {
+        if (!validateStep1()) {
+          setIsLoading(false);
+          return;
+        }
+        setCurrentStep(2);
         setIsLoading(false);
-        return;
-      }
-      console.log("nexttt")
-      if (!validateStep1() || !validateStep2()) {
-        setIsLoading(false);
-        return;
-      }
-      if (currentStep !== 3) {
-        handleNextStep(); // Just move to next step
         return;
       }
 
-      const payload = {
+      // Step 2: Validate and move to step 3
+      if (currentStep === 2) {
+        if (!validateStep2()) {
+          setIsLoading(false);
+          return;
+        }
+        setCurrentStep(3);
+        setIsLoading(false);
+        return;
+      }
+
+      // Step 3: Validate all steps and submit registration
+      if (currentStep === 3) {
+        // Validate all steps before submitting
+        if (!validateStep1() || !validateStep2()) {
+          setIsLoading(false);
+          return;
+        }
+
+        // Prepare registration payload
+        // Backend expects: email, apartment, username, password (required)
+        // Other fields are optional
+        const payload = {
         name: signupData.name,
         username: signupData.username,
         email: signupData.email,
         phone: signupData.phone,
         apartment: signupData.apartment,
-        familyMembers: signupData.familyMembers,
         password: signupData.password,
-        idDocumentType: signupData.idDocumentType.toUpperCase(), // Convert to uppercase
-        cnicNumber: signupData.cnicNumber,
-        ownershipType: signupData.ownershipType, // This will now be 'OWNER' or 'TENANT'
-        emergencyContact: signupData.emergencyContact,
-        emergencyContactPhone: signupData.emergencyContactPhone,
-        occupation: signupData.occupation,
-        workAddress: signupData.workAddress,
-        profilePhoto: signupData.profilePhoto,
-      };
+        // Optional fields
+        ...(signupData.familyMembers && { familyMembers: signupData.familyMembers }),
+        ...(signupData.idDocumentType && { 
+          idDocumentType: signupData.idDocumentType.toUpperCase() 
+        }),
+        ...(signupData.cnicNumber && { cnicNumber: signupData.cnicNumber }),
+        ...(signupData.passportNumber && { passportNumber: signupData.passportNumber }),
+        ...(signupData.driverLicenseNumber && { driverLicenseNumber: signupData.driverLicenseNumber }),
+        ...(signupData.ownershipType && { ownershipType: signupData.ownershipType }),
+        ...(signupData.emergencyContact && { emergencyContact: signupData.emergencyContact }),
+        ...(signupData.emergencyContactPhone && { emergencyContactPhone: signupData.emergencyContactPhone }),
+        ...(signupData.occupation && { occupation: signupData.occupation }),
+        ...(signupData.workAddress && { workAddress: signupData.workAddress }),
+        ...(signupData.profilePhoto && { profilePhoto: signupData.profilePhoto }),
+        ...(signupData.monthlyIncome && { monthlyIncome: signupData.monthlyIncome }),
+        ...(signupData.previousAddress && { previousAddress: signupData.previousAddress }),
+        ...(signupData.reference1Name && { reference1Name: signupData.reference1Name }),
+        ...(signupData.reference1Phone && { reference1Phone: signupData.reference1Phone }),
+        ...(signupData.reference2Name && { reference2Name: signupData.reference2Name }),
+        ...(signupData.reference2Phone && { reference2Phone: signupData.reference2Phone }),
+        ...(signupData.additionalNotes && { additionalNotes: signupData.additionalNotes }),
+        };
 
-      console.log("Payload:", payload); // Debug the payload
+        console.log("Registration payload:", payload);
 
-      const response = await axios.post(`${baseUrl}/auth/resident/register`, payload, {
-        headers: {
-          'Content-Type': 'application/json'
+        // Backend API: POST /resident/auth/resident/register
+        const response = await axios.post(
+          `${baseUrl}/v1/admin/resident/register`, 
+          payload,
+          {
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        console.log("Registration response:", response.data);
+
+        // Backend returns successHandler format:
+        // {
+        //   "success": true,
+        //   "message": "Registration successful",
+        //   "data": {
+        //     "resident": { _id, name, email, apartment, status, approvalStatus }
+        //   },
+        //   "status": 201
+        // }
+
+        if (response?.data?.data?.resident || response?.status === 201) {
+          setSuccess(response.data.message || "Registration successful! Your application is pending approval.");
+          toast.success(response.data.message || "Registration successful!");
+          
+          // Reset form
+          setSignupData({
+            name: "",
+            username: "",
+            email: "",
+            phone: "",
+            apartment: "",
+            familyMembers: 1,
+            password: "",
+            confirmPassword: "",
+            idDocumentType: "CNIC",
+            cnicNumber: "",
+            passportNumber: "",
+            driverLicenseNumber: "",
+            ownershipType: "OWNER",
+            emergencyContact: "",
+            emergencyContactPhone: "",
+            occupation: "",
+            workAddress: "",
+            profilePhoto: "",
+            monthlyIncome: "",
+            previousAddress: "",
+            reference1Name: "",
+            reference1Phone: "",
+            reference2Name: "",
+            reference2Phone: "",
+            additionalNotes: "",
+          });
+          setCurrentStep(1);
+          setActiveTab("login");
         }
-      });
-      if (response.data.resident) {
-        Cookies.set('authToken', response.data.token, {
-          expires: 1, // 1 day
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict'
-        });
-        localStorage.setItem('authToken', response.data.token);
-        setSuccess("Registration successful! Your application is pending approval.");
-        setCurrentStep(1);
-        setActiveTab("login")
       }
-      // Reset form and switch to login tab...
-    } catch (err) {
-      // Error handling as above
+    } catch (err: any) {
+      console.error("Registration error:", err);
+      
+      // Backend error responses:
+      // 400: "Email is already registered" / "Apartment is already registered" / "Username is already taken"
+      const errorMessage = err?.response?.data?.message ||
+        err?.message ||
+        "Registration failed. Please try again.";
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -545,8 +634,8 @@ const ResidentAuth = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="CNIC">CNIC</SelectItem>
-              <SelectItem value="Passport">Passport</SelectItem>
-              <SelectItem value="Driver License">Driver License</SelectItem>
+              <SelectItem value="PASSPORT">Passport</SelectItem>
+              <SelectItem value="DRIVER_LICENSE">Driver License</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -591,7 +680,7 @@ const ResidentAuth = () => {
         </div>
       )}
 
-      {signupData.idDocumentType === "Passport" && (
+      {signupData.idDocumentType === "PASSPORT" && (
         <div className="space-y-2">
           <Label htmlFor="passportNumber" className="text-gray-700 font-medium">
             Passport Number *
@@ -612,7 +701,7 @@ const ResidentAuth = () => {
         </div>
       )}
 
-      {signupData.idDocumentType === "Driver License" && (
+      {signupData.idDocumentType === "DRIVER_LICENSE" && (
         <div className="space-y-2">
           <Label
             htmlFor="driverLicenseNumber"
