@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -47,6 +47,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAdminData } from "@/contexts/AdminDataContext";
 import { toast } from "sonner";
+import axios from "axios";
+import { baseUrl } from "@/Helper/constants";
+import Cookies from "js-cookie";
 
 interface MaintenanceBill {
   id: number;
@@ -84,6 +87,13 @@ const AdminMaintenance = () => {
     null,
   );
   const [isViewBillOpen, setIsViewBillOpen] = useState(false);
+  const [selectedResidentIds, setSelectedResidentIds] = useState<string[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [data, setData] = useState<MaintenanceBill[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const getAuthToken = () => Cookies.get("authToken");
   const [billForm, setBillForm] = useState({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
@@ -100,35 +110,125 @@ const AdminMaintenance = () => {
     ],
   });
 
-  const filteredBills = maintenanceBills.filter((bill) => {
-    const matchesSearch =
-      bill.resident.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bill.apartment.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bill.month.toLowerCase().includes(searchTerm.toLowerCase());
+  const mapApiBillToUiBill = (apiBill: any, index: number): MaintenanceBill => {
+    const monthNumber = Number(apiBill.month);
+    const monthName = isNaN(monthNumber)
+      ? apiBill.month
+      : new Date(2024, monthNumber - 1).toLocaleString("default", {
+          month: "long",
+        });
 
-    const matchesStatus =
-      statusFilter === "all" || bill.status.toLowerCase() === statusFilter;
+    const mapStatus = (status: string): MaintenanceBill["status"] => {
+      const upper = status.toUpperCase();
+      if (upper === "PAID") return "Paid";
+      if (upper === "OVERDUE") return "Overdue";
+      return "Pending";
+    };
 
-    return matchesSearch && matchesStatus;
-  });
+    return {
+      id: index + 1,
+      resident: apiBill.residentId?.name || "Unknown",
+      apartment: apiBill.residentId?.apartment || "",
+      month: monthName,
+      year: apiBill.year,
+      amount: apiBill.amount,
+      dueDate: new Date(apiBill.dueDate).toISOString().split("T")[0],
+      status: mapStatus(apiBill.status),
+      generatedDate: apiBill.generatedDate
+        ? new Date(apiBill.generatedDate).toISOString().split("T")[0]
+        : "",
+      paidDate: apiBill.paidDate
+        ? new Date(apiBill.paidDate).toISOString().split("T")[0]
+        : undefined,
+      items: (apiBill.items || []).map((item: any, idx: number) => ({
+        id: idx + 1,
+        description: item.description,
+        amount: item.amount,
+        // Backend doesn't give type, default to Fixed
+        type: "Fixed",
+      })),
+    };
+  };
+
+  let findProvider = async () => {
+    try {
+      const token = getAuthToken();
+
+      const mapFilterStatusToApi = (status: string): string | undefined => {
+        const lower = status.toLowerCase();
+        if (lower === "paid") return "paid";
+        if (lower === "overdue") return "overdue";
+        if (lower === "pending") return "pending";
+        return undefined;
+      };
+
+      const params: any = {
+        page: currentPage,
+        limit: 10,
+      };
+
+      if (searchTerm.trim()) {
+        params.search = searchTerm.trim();
+      }
+
+      const apiStatus = mapFilterStatusToApi(statusFilter);
+      console.log("apiStatus", apiStatus)
+      if (apiStatus) {
+        params.status = apiStatus;
+      }
+
+      const response = await axios.get(`${baseUrl}/v1/admin/maintenance`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        params,
+      });
+
+      console.log("API Response:", response.data);
+
+      const apiBills = response.data?.data?.bills || [];
+      const pagination = response.data?.data?.pagination;
+
+      const mappedBills: MaintenanceBill[] = apiBills.map(mapApiBillToUiBill);
+      setData(mappedBills);
+
+      if (pagination) {
+        setCurrentPage(pagination.page || 1);
+        setTotalPages(pagination.pages || 1);
+      } else {
+        setTotalPages(1);
+      }
+    } catch (error) {
+      console.error("Error fetching maintenance bills:", error);
+      toast.error("Failed to fetch maintenance bills");
+    }
+  };
+
+  useEffect(() => {
+    findProvider();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, statusFilter, currentPage]);
+
+  const filteredBills = data;
 
   // Calculate statistics
   const stats = useMemo(() => {
-    const totalBills = maintenanceBills.length;
-    const paidBills = maintenanceBills.filter(
+    const totalBills = filteredBills.length;
+    const paidBills = filteredBills.filter(
       (b) => b.status === "Paid",
     ).length;
-    const pendingBills = maintenanceBills.filter(
+    const pendingBills = filteredBills.filter(
       (b) => b.status === "Pending",
     ).length;
-    const overdueBills = maintenanceBills.filter(
+    const overdueBills = filteredBills.filter(
       (b) => b.status === "Overdue",
     ).length;
-    const totalAmount = maintenanceBills.reduce(
+    const totalAmount = filteredBills.reduce(
       (sum, bill) => sum + bill.amount,
       0,
     );
-    const collectedAmount = maintenanceBills
+    const collectedAmount = filteredBills
       .filter((b) => b.status === "Paid")
       .reduce((sum, bill) => sum + bill.amount, 0);
 
@@ -142,37 +242,119 @@ const AdminMaintenance = () => {
       collectionRate:
         totalBills > 0 ? Math.round((paidBills / totalBills) * 100) : 0,
     };
-  }, [maintenanceBills]);
+  }, [filteredBills]);
 
-  const handleGenerateBills = () => {
-    const selectedMonth = new Date(2024, billForm.month - 1).toLocaleString(
-      "default",
-      { month: "long" },
-    );
-    const activeResidents = residents.filter((r) => r.status === "Active");
+  const handleGenerateBills = async () => {
+    try {
+      setIsGenerating(true);
 
-    const newBills = activeResidents.map((resident) => ({
-      resident: resident.name,
-      apartment: resident.apartment,
-      month: selectedMonth,
-      year: billForm.year,
-      amount: billForm.items.reduce((sum, item) => sum + item.amount, 0),
-      dueDate: billForm.dueDate,
-      status: "Pending" as const,
-      generatedDate: new Date().toISOString().split("T")[0],
-      items: billForm.items.map((item, index) => ({
-        id: index + 1,
-        description: item.description,
+      // Validate form
+      if (!billForm.dueDate) {
+        toast.error("Please select a due date");
+        setIsGenerating(false);
+        return;
+      }
+
+      if (billForm.items.length === 0) {
+        toast.error("Please add at least one bill item");
+        setIsGenerating(false);
+        return;
+      }
+
+      // Validate items
+      for (const item of billForm.items) {
+        if (!item.description || item.description.trim() === "") {
+          toast.error("All items must have a description");
+          setIsGenerating(false);
+          return;
+        }
+        if (item.amount === undefined || item.amount < 0) {
+          toast.error("All items must have a valid amount (>= 0)");
+          setIsGenerating(false);
+          return;
+        }
+      }
+
+      // Calculate total amount from items
+      const totalAmount = billForm.items.reduce((sum, item) => sum + item.amount, 0);
+
+      if (totalAmount <= 0) {
+        toast.error("Total bill amount must be greater than 0");
+        setIsGenerating(false);
+        return;
+      }
+
+      // Prepare bill items (only description and amount as per API)
+      const billItems = billForm.items.map((item) => ({
+        description: item.description.trim(),
         amount: item.amount,
-        type: item.type,
-      })),
-    }));
+      }));
 
-    addMultipleMaintenanceBills(newBills);
-    setIsGenerateBillOpen(false);
-    toast.success(
-      `Generated ${newBills.length} maintenance bills for ${selectedMonth} ${billForm.year}`,
-    );
+      // Prepare payload according to backend API
+      const payload = {
+        residentIds: selectedResidentIds.length > 0 ? selectedResidentIds : undefined, // Optional - if empty, generates for all active residents
+        billData: {
+          month: billForm.month,
+          year: billForm.year,
+          amount: totalAmount,
+          dueDate: billForm.dueDate,
+          items: billItems,
+        },
+      };
+
+      console.log("Payload being sent:", payload);
+
+      const token = getAuthToken();
+      const response = await axios.post(
+        `${baseUrl}/v1/admin/maintenance/generate`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      console.log("API Response:", response.data);
+
+      if (response.data.success) {
+        const { bills, skipped } = response.data.data;
+        toast.success(
+          `Successfully generated ${bills.length} maintenance bills${skipped > 0 ? ` (${skipped} skipped - already exist)` : ""}`
+        );
+        setIsGenerateBillOpen(false);
+        // Reset form
+        setBillForm({
+          month: new Date().getMonth() + 1,
+          year: new Date().getFullYear(),
+          dueDate: "",
+          items: [
+            {
+              description: "Maintenance Charge",
+              amount: 1500,
+              type: "Fixed" as const,
+            },
+            { description: "Parking Fee", amount: 500, type: "Fixed" as const },
+            { description: "Security Charge", amount: 300, type: "Fixed" as const },
+            { description: "Utility Charge", amount: 200, type: "Variable" as const },
+          ],
+        });
+        setSelectedResidentIds([]);
+        // Optionally refresh bills list here if you have a fetch function
+      } else {
+        toast.error(response.data.message || "Failed to generate bills");
+      }
+    } catch (error: any) {
+      console.error("Generate bills error:", error);
+      toast.error(
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to generate maintenance bills"
+      );
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleViewBill = (bill: MaintenanceBill) => {
@@ -180,9 +362,25 @@ const AdminMaintenance = () => {
     setIsViewBillOpen(true);
   };
 
-  const handleMarkAsPaid = (billId: number) => {
+  const handleMarkAsPaid = async (billId: number) => {
     updateMaintenanceBillStatus(billId, "Paid");
-    toast.success("Bill marked as paid");
+    const token = getAuthToken();
+    let updateBill  = await axios.put<any>(`${baseUrl}/v1/admin/maintenance/${billId}/status`,   {
+      status: "Paid",
+    }, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+  
+    console.log("updateBill", updateBill)
+    if (updateBill?.data?.success) {
+      toast.success("Bill marked as paid");
+    } else {
+      toast.error(updateBill?.data?.message || "Failed to mark bill as paid");
+    }
+    // toast.success("Bill marked as paid");
   };
 
   const addBillItem = () => {
@@ -363,11 +561,20 @@ const AdminMaintenance = () => {
                   <Input
                     placeholder="Search by resident, apartment, or month..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
                     className="pl-10"
                   />
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <Select
+                  value={statusFilter}
+                  onValueChange={(value) => {
+                    setStatusFilter(value);
+                    setCurrentPage(1);
+                  }}
+                >
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
@@ -466,7 +673,11 @@ const AdminMaintenance = () => {
                               size="sm"
                               className="text-green-600"
                               title="Mark as Paid"
-                              onClick={() => handleMarkAsPaid(bill.id)}
+                              onClick={() =>
+                              {
+                                console.log("biwdawdll", bill)
+                                handleMarkAsPaid(bill.id)
+                              }}
                             >
                               <CheckCircle className="w-4 h-4" />
                             </Button>
@@ -477,6 +688,35 @@ const AdminMaintenance = () => {
                   ))}
                 </TableBody>
               </Table>
+              <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+                <span>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <div className="space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={() =>
+                      setCurrentPage((prev) => (prev > 1 ? prev - 1 : prev))
+                    }
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() =>
+                      setCurrentPage((prev) =>
+                        prev < totalPages ? prev + 1 : prev,
+                      )
+                    }
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -635,9 +875,9 @@ const AdminMaintenance = () => {
               </Button>
               <Button
                 onClick={handleGenerateBills}
-                disabled={!billForm.dueDate}
+                disabled={!billForm.dueDate || isGenerating || billForm.items.length === 0}
               >
-                Generate Bills
+                {isGenerating ? "Generating..." : "Generate Bills"}
               </Button>
             </div>
           </div>
@@ -721,7 +961,7 @@ const AdminMaintenance = () => {
                 {selectedBill.status !== "Paid" && (
                   <Button
                     onClick={() => {
-                      handleMarkAsPaid(selectedBill.id);
+                      handleMarkAsPaid(selectedBill._id);
                       setIsViewBillOpen(false);
                     }}
                     className="bg-green-600 hover:bg-green-700"

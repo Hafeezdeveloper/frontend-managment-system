@@ -157,22 +157,22 @@ const ResidentAuth = () => {
         return;
       }
       let response: any = await axios.post<any>(`${baseUrl}/v1/admin/resident/login`, loginData)
-
-      if (response?.data?.token) {
+      console.log("response", response?.data?.data.token)
+      if (response?.data?.data.token) {
         // Always allow login regardless of previous sessions
         const authenticatedResident = authenticateResident(
-          response?.data?.user?.username,
+          response?.data?.data?.user?.username,
           loginData.password,
         );
         const authenticatedResidentDetails = {
-          ...response.data.user,
+          ...response.data.data.user,
           // Map any fields that might be named differently
-          username: response.data.user.username || loginData.email,
-          email: response.data.user.email || loginData.email,
-          status: response.data.user.status === "ACTIVE" ? "Active" : response.data.user.status
+          username: response.data.data.user.username || loginData.email,
+          email: response.data.data.user.email || loginData.email,
+          status: response.data.data.user.status === "ACTIVE" ? "Active" : response.data.data.user.status
         };
         localStorage.setItem("currentResident", JSON.stringify(authenticatedResidentDetails));
-        localStorage.setItem("authToken", response?.data?.token);
+        localStorage.setItem("authToken", response?.data?.data.token);
         setCurrentResident(authenticatedResidentDetails);
         toast.success(`Welcome back !`);
 
@@ -239,9 +239,9 @@ const ResidentAuth = () => {
     const idValue = signupData[requiredIdField as keyof typeof signupData];
 
     if (!idValue) {
-      const documentTypeName = signupData.idDocumentType === "CNIC" ? "CNIC" 
-        : signupData.idDocumentType === "PASSPORT" ? "Passport" 
-        : "Driver License";
+      const documentTypeName = signupData.idDocumentType === "CNIC" ? "CNIC"
+        : signupData.idDocumentType === "PASSPORT" ? "Passport"
+          : "Driver License";
       setError(`Please enter your ${documentTypeName} number.`);
       return false;
     }
@@ -314,40 +314,40 @@ const ResidentAuth = () => {
         // Backend expects: email, apartment, username, password (required)
         // Other fields are optional
         const payload = {
-        name: signupData.name,
-        username: signupData.username,
-        email: signupData.email,
-        phone: signupData.phone,
-        apartment: signupData.apartment,
-        password: signupData.password,
-        // Optional fields
-        ...(signupData.familyMembers && { familyMembers: signupData.familyMembers }),
-        ...(signupData.idDocumentType && { 
-          idDocumentType: signupData.idDocumentType.toUpperCase() 
-        }),
-        ...(signupData.cnicNumber && { cnicNumber: signupData.cnicNumber }),
-        ...(signupData.passportNumber && { passportNumber: signupData.passportNumber }),
-        ...(signupData.driverLicenseNumber && { driverLicenseNumber: signupData.driverLicenseNumber }),
-        ...(signupData.ownershipType && { ownershipType: signupData.ownershipType }),
-        ...(signupData.emergencyContact && { emergencyContact: signupData.emergencyContact }),
-        ...(signupData.emergencyContactPhone && { emergencyContactPhone: signupData.emergencyContactPhone }),
-        ...(signupData.occupation && { occupation: signupData.occupation }),
-        ...(signupData.workAddress && { workAddress: signupData.workAddress }),
-        ...(signupData.profilePhoto && { profilePhoto: signupData.profilePhoto }),
-        ...(signupData.monthlyIncome && { monthlyIncome: signupData.monthlyIncome }),
-        ...(signupData.previousAddress && { previousAddress: signupData.previousAddress }),
-        ...(signupData.reference1Name && { reference1Name: signupData.reference1Name }),
-        ...(signupData.reference1Phone && { reference1Phone: signupData.reference1Phone }),
-        ...(signupData.reference2Name && { reference2Name: signupData.reference2Name }),
-        ...(signupData.reference2Phone && { reference2Phone: signupData.reference2Phone }),
-        ...(signupData.additionalNotes && { additionalNotes: signupData.additionalNotes }),
+          name: signupData.name,
+          username: signupData.username,
+          email: signupData.email,
+          phone: signupData.phone,
+          apartment: signupData.apartment,
+          password: signupData.password,
+          // Optional fields
+          ...(signupData.familyMembers && { familyMembers: signupData.familyMembers }),
+          ...(signupData.idDocumentType && {
+            idDocumentType: signupData.idDocumentType.toUpperCase()
+          }),
+          ...(signupData.cnicNumber && { cnicNumber: signupData.cnicNumber }),
+          ...(signupData.passportNumber && { passportNumber: signupData.passportNumber }),
+          ...(signupData.driverLicenseNumber && { driverLicenseNumber: signupData.driverLicenseNumber }),
+          ...(signupData.ownershipType && { ownershipType: signupData.ownershipType }),
+          ...(signupData.emergencyContact && { emergencyContact: signupData.emergencyContact }),
+          ...(signupData.emergencyContactPhone && { emergencyContactPhone: signupData.emergencyContactPhone }),
+          ...(signupData.occupation && { occupation: signupData.occupation }),
+          ...(signupData.workAddress && { workAddress: signupData.workAddress }),
+          ...(signupData.profilePhoto && { profilePhoto: signupData.profilePhoto }),
+          ...(signupData.monthlyIncome && { monthlyIncome: signupData.monthlyIncome }),
+          ...(signupData.previousAddress && { previousAddress: signupData.previousAddress }),
+          ...(signupData.reference1Name && { reference1Name: signupData.reference1Name }),
+          ...(signupData.reference1Phone && { reference1Phone: signupData.reference1Phone }),
+          ...(signupData.reference2Name && { reference2Name: signupData.reference2Name }),
+          ...(signupData.reference2Phone && { reference2Phone: signupData.reference2Phone }),
+          ...(signupData.additionalNotes && { additionalNotes: signupData.additionalNotes }),
         };
 
         console.log("Registration payload:", payload);
 
         // Backend API: POST /resident/auth/resident/register
         const response = await axios.post(
-          `${baseUrl}/v1/admin/resident/register`, 
+          `${baseUrl}/v1/admin/resident/register`,
           payload,
           {
             headers: {
@@ -371,7 +371,7 @@ const ResidentAuth = () => {
         if (response?.data?.data?.resident || response?.status === 201) {
           setSuccess(response.data.message || "Registration successful! Your application is pending approval.");
           toast.success(response.data.message || "Registration successful!");
-          
+
           // Reset form
           setSignupData({
             name: "",
@@ -406,13 +406,13 @@ const ResidentAuth = () => {
       }
     } catch (err: any) {
       console.error("Registration error:", err);
-      
+
       // Backend error responses:
       // 400: "Email is already registered" / "Apartment is already registered" / "Username is already taken"
       const errorMessage = err?.response?.data?.message ||
         err?.message ||
         "Registration failed. Please try again.";
-      
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {

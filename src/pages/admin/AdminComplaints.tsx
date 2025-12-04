@@ -49,6 +49,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import axios from "axios";
 import { baseUrl } from "@/Helper/constants";
+import Cookies from "js-cookie";
 
 const AdminComplaints = () => {
   const navigate = useNavigate();
@@ -62,15 +63,17 @@ const AdminComplaints = () => {
   const [responseText, setResponseText] = useState("");
   const [isResponseDialogOpen, setIsResponseDialogOpen] = useState(false);
   const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
-  let token = localStorage.getItem("authToken")
+
+  const getAuthToken = () => Cookies.get("authToken");
   // Filter and search logic
 
   let findProvider = async () => {
+    const token = getAuthToken();
     const response = await axios.get(`${baseUrl}/residents/complaints/all`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
     });
 
     console.log("API Response:", response.data);

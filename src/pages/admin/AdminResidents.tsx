@@ -70,6 +70,7 @@ import {
 import { generateUniqueId } from "@/lib/utils";
 import axios from "axios";
 import { baseUrl } from "@/Helper/constants";
+import Cookies from "js-cookie";
 
 const AdminResidents = () => {
   const navigate = useNavigate();
@@ -128,10 +129,10 @@ const AdminResidents = () => {
       (r) => r.status === "Active",
     ).length;
     const pendingResidents = residents.filter(
-      (r) => r.status === "Pending",
+      (r) => r.status === "pending",
     ).length;
     const pendingApprovals = residents.filter(
-      (r) => r.approvalStatus === "Pending",
+      (r) => r.approvalStatus === "pending",
     ).length;
 
     return {
@@ -141,20 +142,22 @@ const AdminResidents = () => {
       pendingApprovals,
     };
   }, [residents]);
-  let token = localStorage.getItem("authToken")
+
+  const getAuthToken = () => Cookies.get("authToken");
   // Filter and search logic
 
   let findProvider = async () => {
-    const response = await axios.get(`${baseUrl}/residents`, {
+    const token = getAuthToken();
+    const response = await axios.get(`${baseUrl}/v1/admin/resident`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
     });
 
     console.log("API Response:", response.data);
 
-    setProd(response.data.residents)
+    setProd(response.data.data.residents)
   }
 
   console.log("response", prod)
@@ -187,12 +190,17 @@ const AdminResidents = () => {
 
   const handleUpdateStatus = async (id: any, status: any) => {
     console.log(status)
-    const response = await axios.patch<any>(`${baseUrl}/residents/${id}/approval`, { approvalStatus:status }, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    const token = getAuthToken();
+    const response = await axios.put<any>(
+      `${baseUrl}/v1/admin/resident/${id}/approval`,
+      { approvalStatus: status },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
     toast.success(`residents  ${status?.toLowerCase()} successfully`)
     findProvider()
   }
@@ -200,12 +208,12 @@ const AdminResidents = () => {
   const handleApproveResident = async (newStatus: any, resident: any) => {
     console.log("awdwd",newStatus)
     // approveResident(resident.id);
-    // toast.success(`Approved resident: ${resident.name}`);
-    await  handleUpdateStatus(newStatus.id, "APPROVED");
+    // toast.success(`approved resident: ${resident.name}`);
+    await  handleUpdateStatus(newStatus.id, "approved");
   };
 
   const handleRejectResident = (resident: any) => {
-    handleUpdateStatus(resident.id, "REJECTED");
+    handleUpdateStatus(resident.id, "rejected");
   };
 
   const handleSaveEdit = () => {
@@ -255,7 +263,7 @@ const AdminResidents = () => {
       status: addForm.status,
       familyMembers: addForm.familyMembers,
       joinDate: new Date().toISOString().split("T")[0],
-      approvalStatus: "Approved" as const,
+      approvalStatus: "approved" as const,
       idDocumentType: "CNIC" as const,
       ownershipType: "Owner" as const,
     };
@@ -289,15 +297,15 @@ const AdminResidents = () => {
 
   const getApprovalColor = (status: string) => {
     switch (status) {
-      case "Approved":
+      case "approved":
         return "bg-green-100 text-green-800";
-      case "Pending":
+      case "pending":
         return "bg-yellow-100 text-yellow-800";
       case "Rejected":
         return "bg-red-100 text-red-800";
-      case "APPROVED":
+      case "approved":
         return "bg-green-100 text-green-800";
-      case "PENDING":
+      case "pending":
         return "bg-yellow-100 text-yellow-800";
       case "REJECTED":
         return "bg-red-100 text-red-800";
@@ -308,9 +316,9 @@ const AdminResidents = () => {
 
   const getApprovalIcon = (status: string) => {
     switch (status) {
-      case "Approved":
+      case "approved":
         return <CheckCircle className="w-4 h-4" />;
-      case "Pending":
+      case "pending":
         return <Clock className="w-4 h-4" />;
       case "Rejected":
         return <XCircle className="w-4 h-4" />;
@@ -401,7 +409,7 @@ const AdminResidents = () => {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-600">
-                      Pending Approvals
+                      pending Approvals
                     </p>
                     <p className="text-2xl font-bold text-gray-900">
                       {stats.pendingApprovals}
@@ -419,7 +427,7 @@ const AdminResidents = () => {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-600">
-                      Pending Status
+                      pending Status
                     </p>
                     <p className="text-2xl font-bold text-gray-900">
                       {stats.pendingResidents}
@@ -539,7 +547,7 @@ const AdminResidents = () => {
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
-                          {resident.approvalStatus === "Pending" || resident.approvalStatus === "PENDING" && (
+                          {resident.approvalStatus === "pending" && (
                             <>
                               <Button
                                 variant="ghost"
@@ -851,7 +859,7 @@ const AdminResidents = () => {
                 )}
 
               {/* Action Buttons */}
-              {selectedResident.approvalStatus === "Pending" || selectedResident.approvalStatus === "PENDING" && (
+              {selectedResident.approvalStatus === "pending" || selectedResident.approvalStatus === "pending" && (
                 <div className="flex justify-end space-x-3 pt-4 border-t">
                   <Button
                     variant="outline"
@@ -933,7 +941,7 @@ const AdminResidents = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="pending">pending</SelectItem>
                   <SelectItem value="Inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
@@ -1034,7 +1042,7 @@ const AdminResidents = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="pending">pending</SelectItem>
                   <SelectItem value="Inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>

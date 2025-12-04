@@ -46,6 +46,7 @@ import { toast } from "sonner";
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import axios from "axios";
 import { baseUrl } from "@/Helper/constants";
+import Cookies from "js-cookie";
 
 const ComplaintSystem = () => {
   const navigate = useNavigate();
@@ -214,7 +215,7 @@ const ComplaintSystem = () => {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            'Authorization': `Bearer ${Cookies.get('authToken')}`
           },
         },
         

@@ -57,6 +57,9 @@ import axios from "axios";
 import { baseUrl } from "@/Helper/constants";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/toaster";
+import Cookies from "js-cookie";
+
+const ServiceProviderStatus = ["pending", "approved", "rejected"];
 
 const AdminServiceProviders = () => {
   const navigate = useNavigate();
@@ -75,16 +78,21 @@ const AdminServiceProviders = () => {
   const [prod, setProd] = useState<any>([]);
   const [selectedProvider, setSelectedProvider] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
-  let token = localStorage.getItem("authToken")
+
+  const getAuthToken = () => Cookies.get("authToken");
   // Filter and search logic
 
   let findProvider = async () => {
-    const response = await axios.get(`${baseUrl}/v1/admin/service-providers/all`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    const token = getAuthToken();
+    const response = await axios.get(
+      `${baseUrl}/v1/admin/service-providers/all`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
 
     console.log("API Response:", response.data);
 
@@ -126,22 +134,36 @@ const AdminServiceProviders = () => {
     return { total, pending, active, rejected, suspended, avgRating };
   }, [serviceProviders]);
   const handleUpdateStatus = async (id: any, status: any) => {
-    console.log("Awd", token)
-    const response = await axios.patch<any>(`${baseUrl}/service-providers/${id}/approval`, { status }, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    // Payload being sent to API
+    const payload = { status };
+    console.log("Payload being sent:", payload);
+    console.log("Service Provider ID:", id);
+    console.log("Status:", status);
+    
+    const token = getAuthToken();
+    const response = await axios.put<any>(
+      `${baseUrl}/v1/admin/service-providers/${id}/approval`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
     toast.success(`Service provider ${status?.toLowerCase()} successfully`)
     findProvider()
   }
 
   const handleStatusChange = (providerId: number, newStatus: string) => {
+    console.log("New Status:", newStatus);
+    // Map UI status to API status based on ServiceProviderStatus constant
     if (newStatus === "Active") {
-      handleUpdateStatus(providerId, "ACTIVE");
+      handleUpdateStatus(providerId, ServiceProviderStatus[1]); // "approved"
     } else if (newStatus === "Rejected") {
-      handleUpdateStatus(providerId, "REJECTED");
+      handleUpdateStatus(providerId, ServiceProviderStatus[2]); // "rejected"
+    } else if (newStatus === "Suspended") {
+      handleUpdateStatus(providerId, ServiceProviderStatus[3]);
     }
   };
 
@@ -294,7 +316,7 @@ const AdminServiceProviders = () => {
                           <Eye className="w-4 h-4 mr-2" />
                           View Details
                         </DropdownMenuItem>
-                        {provider?.status === "Pending" || provider?.status === "PENDING" && (
+                        {provider?.status?.toLowerCase() === "pending" && (
                           <>
                             <DropdownMenuItem
                               onClick={() =>
@@ -391,7 +413,7 @@ const AdminServiceProviders = () => {
                       <Eye className="w-4 h-4 mr-2" />
                       Details
                     </Button>
-                    {provider.status === "Pending" || provider.status === "PENDING" && (
+                    {provider.status?.toLowerCase() === "pending" && (
                       <>
                         <Button
                           size="sm"
@@ -507,7 +529,7 @@ const AdminServiceProviders = () => {
                       <label className="text-sm font-medium text-gray-500">
                         Status
                       </label>
-                      <div className="mt-1">
+                      <div className="rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-1" >
                         {getStatusBadge(selectedProvider.status)}
                       </div>
                     </div>

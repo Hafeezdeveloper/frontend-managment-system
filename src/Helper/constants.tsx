@@ -1,5 +1,5 @@
 // Mock data for departments
-export const baseUrl = "http://192.168.0.107:5000/api"
+export const baseUrl = "http://192.168.1.124:5000/api"
 export const Departments = [
   { value: 'cs', name: 'Computer Science' },
   { value: 'ee', name: 'Electrical Engineering' },
