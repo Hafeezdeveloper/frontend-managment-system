@@ -63,28 +63,85 @@ const AdminComplaints = () => {
   const [responseText, setResponseText] = useState("");
   const [isResponseDialogOpen, setIsResponseDialogOpen] = useState(false);
   const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
+  const [allComplaints, setAllComplaints] = useState<any>({ 
+    totalComplaints: 0,
+    totalOpenComplaints: 0,
+    totalInProgressComplaints: 0,
+    totalResolvedComplaints: 0,
+   });
 
-  const getAuthToken = () => Cookies.get("authToken");
-  // Filter and search logic
+  const getAuthToken = () => Cookies.get("authToken") || localStorage.getItem("authToken");
 
-  let findProvider = async () => {
-    const token = getAuthToken();
-    const response = await axios.get(`${baseUrl}/residents/complaints/all`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
+  // Fetch complaints from API
+  const fetchComplaints = async () => {
+    try {
+      const token = getAuthToken();
 
-    console.log("API Response:", response.data);
+      if (!token) {
+        console.error("No token found");
+        return;
+      }
 
-    setProd(response.data.complaints)
-  }
+      const response = await axios.get(`${baseUrl}/v1/admin/resident/complaints`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
 
-  console.log("response", prod)
+      console.log("API Response:", response.data);
+
+      if (response.data?.data?.complaints) {
+
+        setAllComplaints({
+          totalComplaints: response.data.data.totalComplaints,
+          totalOpenComplaints: response.data.data.totalOpenComplaints,
+          totalInProgressComplaints: response.data.data.totalInProgressComplaints,
+          totalResolvedComplaints: response.data.data.totalResolvedComplaints,
+        });
+        // Format complaints to match the expected structure
+        const formattedComplaints = response.data.data.complaints.map((complaint: any) => ({
+          id: complaint.id,
+          title: complaint.title,
+          category: complaint.category,
+          status: complaint.status,
+          priority: complaint.priority,
+          description: complaint.description,
+          complaintText: complaint.complaintText || complaint.description,
+          images: complaint.images || [],
+          adminResponse: complaint.adminResponse,
+          responseDate: complaint.responseDate,
+          residentId: complaint.residentId,
+          resident: complaint.resident || {
+            name: complaint.residentId?.name || "Unknown",
+            apartment: complaint.residentId?.apartment || "N/A"
+          },
+          createdAt: complaint.createdAt,
+          updatedAt: complaint.updatedAt,
+          timestamp: complaint.createdAt ? new Date(complaint.createdAt) : new Date(),
+        }));
+
+        setProd(formattedComplaints);
+      }
+    } catch (err: any) {
+      console.error("Error fetching complaints:", err);
+      toast.error(err.response?.data?.message || "Failed to fetch complaints");
+    }
+  };
+
+  // Fetch complaints on component mount
   useEffect(() => {
-    findProvider()
-  }, [])
+    fetchComplaints();
+  }, []);
+
+  // Auto-refresh complaints every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchComplaints();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Real-time update mechanism
   useEffect(() => {
@@ -136,68 +193,49 @@ const AdminComplaints = () => {
     setResponseText("");
   };
 
-  const filteredComplaints = complaints.filter((complaint) => {
+  const filteredComplaints = prod.filter((complaint: any) => {
     const matchesSearch =
-      complaint.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      complaint.resident.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      complaint.category.toLowerCase().includes(searchTerm.toLowerCase());
+      complaint?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      complaint?.resident?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      complaint?.category?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus =
-      statusFilter === "all" || complaint.status.toLowerCase() === statusFilter;
+      statusFilter === "all" || complaint?.status?.toLowerCase() === statusFilter.toLowerCase();
 
     return matchesSearch && matchesStatus;
   });
 
   // Real-time statistics calculation
-  const stats = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const totalComplaints = complaints.length;
-    const openComplaints = complaints.filter((c) => c.status === "Open").length;
-    const inProgressComplaints = complaints.filter(
-      (c) => c.status === "In Progress",
-    ).length;
-    const resolvedToday = complaints.filter(
-      (c) =>
-        c.status === "Resolved" &&
-        c.timestamp >= today &&
-        c.timestamp < tomorrow,
-    ).length;
-
-    return [
-      {
-        title: "Total Complaints",
-        value: totalComplaints.toString(),
-        icon: AlertTriangle,
-        color: "text-orange-600",
-        bgColor: "bg-orange-100",
-      },
-      {
-        title: "Open Complaints",
-        value: openComplaints.toString(),
-        icon: Clock,
-        color: "text-red-600",
-        bgColor: "bg-red-100",
-      },
-      {
-        title: "In Progress",
-        value: inProgressComplaints.toString(),
-        icon: MessageSquare,
-        color: "text-blue-600",
+  let arr  = [
+    {
+      title: "Total Complaints",
+      value: allComplaints.totalComplaints | 0,
+      icon: AlertTriangle,
+      color: "text-orange-600",
+      bgColor: "bg-orange-100",
+    },
+    {
+      title: "Open Complaints",
+      value: allComplaints.totalOpenComplaints | 0,
+      icon: Clock,
+      color: "text-red-600",
+      bgColor: "bg-red-100",
+    },
+    {
+      title: "In Progress Complaints",
+      value: allComplaints.totalInProgressComplaints | 0,
+      icon: MessageSquare,
+      color: "text-blue-600",
         bgColor: "bg-blue-100",
-      },
-      {
-        title: "Resolved Today",
-        value: resolvedToday.toString(),
-        icon: CheckCircle,
-        color: "text-green-600",
-        bgColor: "bg-green-100",
-      },
-    ];
-  }, [complaints]);
+    },
+    {
+      title: "Resolved Complaints",
+      value: allComplaints.totalResolvedComplaints | 0,
+      icon: CheckCircle,
+      color: "text-green-600",
+      bgColor: "bg-green-100",
+    },
+  ]
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -225,6 +263,17 @@ const AdminComplaints = () => {
     }
   };
 
+  const updateStatusComplaint = async (complaintId: string, status: string) => {    
+    const token = getAuthToken();
+    const response = await axios.put(`${baseUrl}/v1/admin/resident/complaints/${complaintId}/admin-status-update`, { status }, {
+      headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  toast.success("Complaint status updated successfully");
+  fetchComplaints();
+}
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -271,7 +320,7 @@ const AdminComplaints = () => {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {stats.map((stat, index) => {
+              {arr.map((stat, index) => {
                 const Icon = stat.icon;
                 return (
                   <Card
@@ -489,31 +538,24 @@ const AdminComplaints = () => {
                             <MessageSquare className="w-4 h-4" />
                           </Button> */}
 
-                          {complaint.status === "Open" && (
+                          {complaint?.status?.toLowerCase() === "open" && (
                             <Button
                               variant="ghost"
                               size="sm"
                               className="text-blue-600"
                               title="Mark as In Progress"
-                              onClick={() =>
-                                updateComplaintStatus(
-                                  complaint.id,
-                                  "In Progress",
-                                )
-                              }
+                              onClick={() => updateStatusComplaint(complaint.id, "in_progress")}
                             >
                               <Clock className="w-4 h-4" />
                             </Button>
                           )}
-                          {complaint.status !== "Resolved" && (
+                          {complaint?.status?.toLowerCase() !== "resolved" && (
                             <Button
                               variant="ghost"
                               size="sm"
                               className="text-green-600"
                               title="Mark as Resolved"
-                              onClick={() =>
-                                updateComplaintStatus(complaint.id, "Resolved")
-                              }
+                              onClick={() => updateStatusComplaint(complaint.id, "resolved")}
                             >
                               <CheckCircle className="w-4 h-4" />
                             </Button>

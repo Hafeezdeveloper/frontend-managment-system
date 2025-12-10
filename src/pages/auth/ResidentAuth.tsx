@@ -160,6 +160,7 @@ const ResidentAuth = () => {
       console.log("response", response?.data?.data.token)
       if (response?.data?.data.token) {
         // Always allow login regardless of previous sessions
+        console.log(response?.data)
         const authenticatedResident = authenticateResident(
           response?.data?.data?.user?.username,
           loginData.password,
@@ -169,10 +170,14 @@ const ResidentAuth = () => {
           // Map any fields that might be named differently
           username: response.data.data.user.username || loginData.email,
           email: response.data.data.user.email || loginData.email,
-          status: response.data.data.user.status === "ACTIVE" ? "Active" : response.data.data.user.status
+          status: response.data.data.user.status === "active" ? "active" : response.data.data.user.status
         };
-        localStorage.setItem("currentResident", JSON.stringify(authenticatedResidentDetails));
-        localStorage.setItem("authToken", response?.data?.data.token);
+        Cookies.set('authToken', response?.data?.data.token, {
+          expires: 1, // 1 day
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict'
+        });
+        // localStorage.setItem("currentResident", JSON.stringify(authenticatedResidentDetails));
         setCurrentResident(authenticatedResidentDetails);
         toast.success(`Welcome back !`);
 

@@ -251,7 +251,7 @@ interface AdminDataContextType {
   addMaintenanceBill: (bill: Omit<MaintenanceBill, "id">) => void;
   updateMaintenanceBillStatus: (
     id: number,
-    status: "Pending" | "Paid" | "Overdue",
+    status: "pending" | "paid" | "overdue",
     paidDate?: string,
   ) => void;
   addMultipleMaintenanceBills: (bills: Omit<MaintenanceBill, "id">[]) => void;

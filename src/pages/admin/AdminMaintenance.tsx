@@ -53,6 +53,7 @@ import Cookies from "js-cookie";
 
 interface MaintenanceBill {
   id: number;
+  _id: string;
   resident: string;
   apartment: string;
   month: string;
@@ -127,6 +128,7 @@ const AdminMaintenance = () => {
 
     return {
       id: index + 1,
+      _id: apiBill._id,
       resident: apiBill.residentId?.name || "Unknown",
       apartment: apiBill.residentId?.apartment || "",
       month: monthName,
@@ -363,10 +365,10 @@ const AdminMaintenance = () => {
   };
 
   const handleMarkAsPaid = async (billId: number) => {
-    updateMaintenanceBillStatus(billId, "Paid");
+    updateMaintenanceBillStatus(billId, "paid");
     const token = getAuthToken();
     let updateBill  = await axios.put<any>(`${baseUrl}/v1/admin/maintenance/${billId}/status`,   {
-      status: "Paid",
+      status: "paid",
     }, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -675,9 +677,9 @@ const AdminMaintenance = () => {
                               title="Mark as Paid"
                               onClick={() =>
                               {
-                                console.log("biwdawdll", bill)
-                                handleMarkAsPaid(bill.id)
-                              }}
+                                // console.log("biwdawdawdadl l", bill)
+                                handleMarkAsPaid(bill._id)
+                              }}  
                             >
                               <CheckCircle className="w-4 h-4" />
                             </Button>

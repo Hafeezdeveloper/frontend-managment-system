@@ -65,34 +65,128 @@ const ComplaintSystem = () => {
 
   const [activeTab, setActiveTab] = useState("lodge");
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingComplaints, setIsLoadingComplaints] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [recordingTime, setRecordingTime] = useState(0);
   const [voiceNote, setVoiceNote] = useState<string>("");
+  const [userComplaints, setUserComplaints] = useState<any[]>([]);
+  
+  // Refs for recording timers
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const [newComplaint, setNewComplaint] = useState({
     title: "",
     category: "",
     description: "",
-    compalainText: "",
-    priority: "Medium" as "Low" | "Medium" | "High",
+    complaintText: "",
+    priority: "medium" as "low" | "medium" | "high",  
     voiceNote: "",
+    images: [] as string[],
   });
 
-  // Update description with speech recognition transcript
-  useEffect(() => {
-    if (transcript) {
-      setNewComplaint(prev => ({
-        ...prev,
-        compalainText: transcript
-      }));
-    }
-  }, [transcript]);
+  // Don't update description in real-time, only when recording stops
 
-  // Get user's complaints from shared context
-  const userComplaints = currentResident
-    ? getResidentComplaints(currentResident.id)
-    : [];
+  // Timer effect - runs when listening state changes
+  useEffect(() => {
+    if (listening) {
+      // Reset timer when recording starts
+      setRecordingTime(0);
+      
+      // Start timer interval
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime((prev) => {
+          const newTime = prev + 1;
+          // Auto stop at 60 seconds
+          if (newTime >= 60) {
+            stopRecording();
+            return 60;
+          }
+          return newTime;
+        });
+      }, 1000);
+    } else {
+      // Clear interval when recording stops
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+      if (recordingTimerRef.current) {
+        clearTimeout(recordingTimerRef.current);
+      }
+    };
+  }, [listening]);
+
+  // Fetch complaints from API
+  const fetchComplaints = async () => {
+    if (!currentResident) return;
+    
+    setIsLoadingComplaints(true);
+    try {
+      const token = Cookies.get('authToken') || localStorage.getItem('authToken');
+      
+      if (!token) {
+        console.error("No token found");
+        setIsLoadingComplaints(false);
+        return;
+      }
+
+      const response = await axios.get(`${baseUrl}/v1/admin/resident/complaints`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data?.data?.complaints) {
+        // Format complaints to match the expected structure
+        const formattedComplaints = response.data.data.complaints.map((complaint: any) => ({
+          id: complaint.id,
+          title: complaint.title,
+          category: complaint.category,
+          status: complaint.status,
+          priority: complaint.priority,
+          description: complaint.description,
+          images: complaint.images || [],
+          adminResponse: complaint.adminResponse,
+          responseDate: complaint.responseDate,
+          residentId: complaint.residentId,
+          date: complaint.createdAt ? new Date(complaint.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
+          timestamp: complaint.createdAt ? new Date(complaint.createdAt) : new Date(),
+          voiceNote: complaint.voiceNote || complaint.complaintText || "",
+        }));
+        
+        setUserComplaints(formattedComplaints);
+      }
+    } catch (err: any) {
+      console.error("Error fetching complaints:", err);
+      setError(err.response?.data?.message || "Failed to fetch complaints");
+    } finally {
+      setIsLoadingComplaints(false);
+    }
+  };
+
+  // Fetch complaints on component mount and when tab changes to history
+  useEffect(() => {
+    if (currentResident) {
+      fetchComplaints();
+    }
+  }, [currentResident]);
+
+  // Refresh complaints when switching to history tab
+  useEffect(() => {
+    if (activeTab === "history" && currentResident) {
+      fetchComplaints();
+    }
+  }, [activeTab]);
 
   // Redirect if not authenticated
   if (!currentResident) {
@@ -148,40 +242,81 @@ const ComplaintSystem = () => {
     }));
   };
 
-  const startRecording = () => {
+  const startRecording = async () => {
     if (!browserSupportsSpeechRecognition) {
       setError("Your browser doesn't support speech recognition. Please use Chrome or Edge.");
+      toast.error("Browser doesn't support speech recognition");
       return;
     }
 
-    if (!isMicrophoneAvailable) {
-      setError("Microphone access is required for voice recording. Please check your permissions.");
-      return;
+    try {
+      // Request microphone permission explicitly
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Stop the stream immediately as we just needed permission
+      stream.getTracks().forEach(track => track.stop());
+      
+      resetTranscript();
+      setVoiceNote("");
+      setError("");
+      
+      // Clear any existing interval first
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+      
+      SpeechRecognition.startListening({ 
+        continuous: true, 
+        language: 'en-US' 
+      });
+      
+      // Timer will start automatically via useEffect when listening becomes true
+
+      // Auto stop after 60 seconds
+      recordingTimerRef.current = setTimeout(() => {
+        stopRecording();
+      }, 60000);
+      
+      toast.success("Speak now... Click 'Speak End' when finished!");
+    } catch (err: any) {
+      console.error("Microphone permission error:", err);
+      let errorMessage = "Microphone access is required for voice recording.";
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorMessage = "Microphone permission denied. Please allow microphone access in your browser settings.";
+        toast.error("Please allow microphone access in browser settings");
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errorMessage = "No microphone found. Please connect a microphone and try again.";
+        toast.error("No microphone detected");
+      } else {
+        errorMessage = `Cannot access microphone: ${err.message}`;
+        toast.error("Microphone access failed");
+      }
+      
+      setError(errorMessage);
     }
-
-    resetTranscript();
-    SpeechRecognition.startListening({ continuous: true, language: 'en-US' });
-    setRecordingTime(0);
-
-    const timer = setInterval(() => {
-      setRecordingTime((prev) => prev + 1);
-    }, 1000);
-
-    // Auto stop after 60 seconds
-    setTimeout(() => {
-      stopRecording();
-      clearInterval(timer);
-    }, 60000);
   };
 
   const stopRecording = () => {
     SpeechRecognition.stopListening();
-    if (transcript) {
+    
+    // Clear timers (interval will be cleared by useEffect when listening becomes false)
+    if (recordingTimerRef.current) {
+      clearTimeout(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+
+    // Update description and complaintText with final transcript only when stopped
+    if (transcript && transcript.trim()) {
       setVoiceNote(transcript);
       setNewComplaint(prev => ({
         ...prev,
-        compalainText: transcript
+        description: transcript,
+        complaintText: transcript
       }));
+      toast.success("Voice converted to text successfully! ✅");
+    } else {
+      toast.warning("No speech detected. Please try again.");
     }
   };
 
@@ -202,22 +337,37 @@ const ComplaintSystem = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-
+    console.log("newComplaint", newComplaint)
     setIsLoading(true);
     setError("");
     try {
-      const response = await axios.post(`${baseUrl}/residents/complaints`,
+      // Get token from localStorage or Cookies (resident login stores in localStorage)
+      const token = Cookies.get('authToken') || localStorage.getItem('authToken');
+      
+      if (!token) {
+        setError("You are not authenticated. Please login again.");
+        toast.error("Authentication required. Please login again.");
+        navigate("/resident/auth");
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await axios.post(`${baseUrl}/v1/admin/resident/complaints`,
         {
-          ...newComplaint,
-          residentId: currentResident.id,
-          compalainText:voiceNote
+          title: newComplaint.title,
+          category: newComplaint.category,
+          description: newComplaint.description,
+          priority: newComplaint.priority,
+          images: newComplaint.images || [],
+          complaintText: newComplaint.complaintText || newComplaint.description,
+          voiceNote: newComplaint.complaintText || "",
         },
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Cookies.get('authToken')}`
+            'Authorization': `Bearer ${token}`
           },
-        },
+        },  
         
       );
 
@@ -234,15 +384,20 @@ const ComplaintSystem = () => {
         title: "",
         category: "",
         description: "",
-        priority: "Medium",
+        priority: "medium",
         voiceNote: "",
-        compalainText: ""
+        complaintText: "",
+        images: []
       });
       setVoiceNote("");
       resetTranscript();
+      setRecordingTime(0);
+      
+      // Refresh complaints list and switch to history tab
+      await fetchComplaints();
       setActiveTab("history");
-    } catch (err) {
-      setError(err.message || "Failed to submit complaint. Please try again.");
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || "Failed to submit complaint. Please try again.");
       toast.error("Failed to submit complaint");
     } finally {
       setIsLoading(false);
@@ -313,7 +468,7 @@ const ComplaintSystem = () => {
                 <span className="ml-1 capitalize">{complaint.status}</span>
               </Badge>
               <Badge className={getPriorityColor(complaint.priority)}>
-                {complaint.priority.toUpperCase()}
+                {complaint.priority}
               </Badge>
             </div>
           </div>
@@ -359,10 +514,10 @@ const ComplaintSystem = () => {
             </div>
           )}
 
-          {complaint.voiceNote && (
+          {(complaint as any).voiceNote && (
             <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
               <strong className="text-purple-800">Voice Note:</strong>
-              <p className="mt-1 text-purple-700">{complaint.voiceNote}</p>
+              <p className="mt-1 text-purple-700">{(complaint as any).voiceNote}</p>
             </div>
           )}
 
@@ -526,112 +681,88 @@ const ComplaintSystem = () => {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="Low">Low</SelectItem>
-                                <SelectItem value="Medium">Medium</SelectItem>
-                                <SelectItem value="High">High</SelectItem>
+                                <SelectItem value="low" >Low</SelectItem>
+                                <SelectItem value="medium">Medium</SelectItem>
+                                <SelectItem value="high">High</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
                         </div>
 
                         <div className="space-y-2">
-                          <Label
-                            htmlFor="description"
-                            className="text-gray-700 font-medium"
-                          >
-                            Detailed Description *
-                          </Label>
+                          <div className="flex items-center justify-between">
+                            <Label
+                              htmlFor="description"
+                              className="text-gray-700 font-medium"
+                            >
+                              Detailed Description *
+                            </Label>
+                            <div className="flex gap-2">
+                              {!listening ? (
+                                <Button
+                                  type="button"
+                                  variant="default"
+                                  size="sm"
+                                  onClick={startRecording}
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                  disabled={!browserSupportsSpeechRecognition}
+                                >
+                                  <Mic className="w-4 h-4 mr-2" />
+                                  Speak Now
+                                </Button>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={stopRecording}
+                                  className="bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                  <MicOff className="w-4 h-4 mr-2" />
+                                  Speak End
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          {!browserSupportsSpeechRecognition && (
+                            <Alert variant="destructive" className="mb-2">
+                              <AlertTriangle className="h-4 w-4" />
+                              <AlertDescription>
+                                Your browser doesn't support speech recognition. Please use Chrome or Edge.
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                          {listening && (
+                            <div className="flex items-center space-x-2 bg-red-50 p-3 rounded border border-red-200 mb-2">
+                              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                              <span className="text-sm font-medium text-red-700">
+                                🎤 Listening... {formatTime(recordingTime)}
+                              </span>
+                            </div>
+                          )}
                           <Textarea
                             id="description"
                             value={newComplaint.description}
                             onChange={(e) =>
                               handleInputChange("description", e.target.value)
                             }
-                            placeholder="Provide detailed information about the issue, including location, time, and any other relevant details..."
+                            placeholder={listening ? "Speak clearly... Click 'Speak End' when finished to convert voice to text" : "Provide detailed information about the issue, including location, time, and any other relevant details... Or click 'Speak Now' to use voice-to-text."}
                             className="border-gray-300 focus:border-red-500 focus:ring-red-500 min-h-[120px]"
                             required
                           />
-                        </div>
-
-                        {/* Voice Note Section */}
-                        <div className="space-y-2">
-                          <Label className="text-gray-700 font-medium">
-                            Voice Note (Optional)
-                          </Label>
-                          <div className="border border-gray-300 rounded-lg p-4 space-y-3">
-                            {!browserSupportsSpeechRecognition && (
-                              <Alert variant="destructive" className="mb-3">
-                                <AlertTriangle className="h-4 w-4" />
-                                <AlertDescription>
-                                  Your browser doesn't support speech recognition. Please use Chrome or Edge.
-                                </AlertDescription>
-                              </Alert>
-                            )}
-
-                            {!voiceNote && !listening && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={startRecording}
-                                className="w-full"
-                                disabled={!browserSupportsSpeechRecognition || !isMicrophoneAvailable}
-                              >
-                                <Mic className="w-4 h-4 mr-2" />
-                                Start Voice Recording
-                              </Button>
-                            )}
-
-                            {listening && (
-                              <div className="flex items-center justify-between bg-red-50 p-3 rounded border border-red-200">
-                                <div className="flex items-center space-x-3">
-                                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                                  <span className="text-sm font-medium text-red-700">
-                                    Recording... {formatTime(recordingTime)}
-                                  </span>
-                                </div>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={stopRecording}
-                                  className="text-red-600 border-red-300"
-                                >
-                                  <MicOff className="w-4 h-4 mr-1" />
-                                  Stop
-                                </Button>
-                              </div>
-                            )}
-
-                            {voiceNote && !listening && (
-                              <div className="flex flex-col space-y-3 bg-green-50 p-3 rounded border border-green-200">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-sm font-medium text-green-700">
-                                    Recorded Note
-                                  </span>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setNewComplaint(prev => ({
-                                        ...prev,
-                                        compalainText: "",
-                                      }));
-                                      resetTranscript();
-                                    }}
-                                    className="text-red-600 border-red-300"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                                <p className="text-sm text-green-700">{voiceNote}</p>
-                              </div>
-                            )}
-
-                            <p className="text-xs text-gray-500">
-                              Record your complaint in English. Click stop when finished.
-                            </p>
-                          </div>
+                          {transcript && listening && (
+                            <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                              <p className="text-xs font-medium text-blue-800 mb-1">
+                                📝 Live Preview (will be saved when you click "Speak End"):
+                              </p>
+                              <p className="text-sm text-blue-700 italic">
+                                {transcript}
+                              </p>
+                            </div>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">
+                            💡 Tip: Click "Speak Now" → Speak your complaint → Click "Speak End" to convert voice to text
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -673,6 +804,14 @@ const ComplaintSystem = () => {
                     </Badge>
                   </div>
 
+                  {isLoadingComplaints ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="flex flex-col items-center space-y-4">
+                        <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-gray-600">Loading complaints...</p>
+                      </div>
+                    </div>
+                  ) : (
                   <div className="grid gap-4">
                     {userComplaints.map((complaint) => (
                       <Card
@@ -699,7 +838,7 @@ const ComplaintSystem = () => {
                                     complaint.priority,
                                   )}
                                 >
-                                  {complaint.priority.toUpperCase()}
+                                  {complaint.priority ? complaint.priority.toUpperCase() : "MEDIUM"}
                                 </Badge>
                               </div>
 
@@ -713,10 +852,10 @@ const ComplaintSystem = () => {
                                 {complaint.description}
                               </p>
 
-                              {complaint.voiceNote && (
+                              {(complaint as any).voiceNote && (
                                 <div className="bg-purple-50 p-3 rounded border border-purple-200 mb-3">
                                   <p className="text-sm text-purple-700">
-                                    <strong>Voice Note:</strong> {complaint.voiceNote}
+                                    <strong>Voice Note:</strong> {(complaint as any).voiceNote}
                                   </p>
                                 </div>
                               )}
@@ -758,7 +897,7 @@ const ComplaintSystem = () => {
                       </Card>
                     ))}
 
-                    {userComplaints.length === 0 && (
+                    {userComplaints.length === 0 && !isLoadingComplaints && (
                       <Card className="border border-gray-200">
                         <CardContent className="p-12 text-center">
                           <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -780,6 +919,7 @@ const ComplaintSystem = () => {
                       </Card>
                     )}
                   </div>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>

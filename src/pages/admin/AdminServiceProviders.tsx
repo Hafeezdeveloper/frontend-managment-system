@@ -78,11 +78,13 @@ const AdminServiceProviders = () => {
   const [prod, setProd] = useState<any>([]);
   const [selectedProvider, setSelectedProvider] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [loader, setLoader] = useState(false);
 
   const getAuthToken = () => Cookies.get("authToken");
   // Filter and search logic
 
   let findProvider = async () => {
+    setLoader(true)
     const token = getAuthToken();
     const response = await axios.get(
       `${baseUrl}/v1/admin/service-providers/all`,
@@ -94,8 +96,7 @@ const AdminServiceProviders = () => {
       },
     );
 
-    console.log("API Response:", response.data);
-
+    setLoader(false)
     setProd(response.data.data.serviceProviders)
   }
 
@@ -168,23 +169,29 @@ const AdminServiceProviders = () => {
   };
 
   const getStatusBadge = (status: string) => {
+    console.log("status", status)
     const statusConfig = {
-      Pending: {
+      pending: {
         variant: "secondary" as const,
         icon: Clock,
         color: "text-yellow-600",
       },
-      Active: {
+      active: {
         variant: "default" as const,
         icon: CheckCircle,
         color: "text-green-600",
       },
-      Rejected: {
+      approved: {
+        variant: "" as const,
+        icon: UserCheck,
+        color: "text-green-600",
+      },
+      rejected: {
         variant: "destructive" as const,
         icon: XCircle,
         color: "text-red-600",
       },
-      Suspended: {
+      suspended: {
         variant: "outline" as const,
         icon: Pause,
         color: "text-orange-600",
@@ -192,7 +199,7 @@ const AdminServiceProviders = () => {
     };
 
     const config =
-      statusConfig[status as keyof typeof statusConfig] || statusConfig.Pending;
+      statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
     const Icon = config.icon;
 
     return (
@@ -276,7 +283,10 @@ const AdminServiceProviders = () => {
 
 
 
-          {/* Service Providers List */}
+          {/* Service Providers List */}  
+          {loader ? ( <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-gray-900"></div>
+          </div>) : (       
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {prod.map((provider) => (
               <Card
@@ -336,20 +346,20 @@ const AdminServiceProviders = () => {
                             </DropdownMenuItem>
                           </>
                         )}
-                        {provider?.status === "Active" || provider.status === "APPROVED" && (
+                        {provider?.status === "active" || provider.status === "approved" && (
                           <DropdownMenuItem
                             onClick={() =>
-                              handleStatusChange(provider.id, "Suspended")
+                              handleStatusChange(provider.id, "suspended")
                             }
                           >
                             <Pause className="w-4 h-4 mr-2" />
                             Suspend
                           </DropdownMenuItem>
                         )}
-                        {provider.status === "Suspended" && (
+                        {provider.status === "suspended" && (
                           <DropdownMenuItem
                             onClick={() =>
-                              handleStatusChange(provider.id, "Active")
+                              handleStatusChange(provider.id, "active")
                             }
                           >
                             <UserCheck className="w-4 h-4 mr-2" />
@@ -442,7 +452,7 @@ const AdminServiceProviders = () => {
               </Card>
             ))}
           </div>
-
+          )}
 
         </div>
       </main>

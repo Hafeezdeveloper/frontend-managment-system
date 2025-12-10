@@ -1,5 +1,7 @@
+import { jwtDecode } from "jwt-decode";
+
 // Mock data for departments
-export const baseUrl = "http://192.168.1.124:5000/api"
+export const baseUrl = "http://192.168.0.107:5000/api"
 export const Departments = [
   { value: 'cs', name: 'Computer Science' },
   { value: 'ee', name: 'Electrical Engineering' },
@@ -80,4 +82,30 @@ export const validatePassword = (password: string): boolean => {
   const passwordRegex =
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+])[A-Za-z\d!@#$%^&*()_+]{8,}$/;
   return passwordRegex.test(password);
+};
+
+
+
+ export const getUserFromCookie = () => {
+  // Cookie read function
+  const getCookie = (name) => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(";").shift();
+  };
+
+  const token = getCookie("authToken");
+
+  if (!token) return null;
+
+  // Token decode
+  try {
+    const decoded = jwtDecode(token);
+
+    // ID exists?
+    return decoded
+  } catch (err) {
+    console.log("Invalid token", err);
+    return null;
+  }
 };

@@ -41,6 +41,10 @@ import { Separator } from "@/components/ui/separator";
 import { useResident } from "@/contexts/ResidentContext";
 import { useAdminData } from "@/contexts/AdminDataContext";
 import { toast } from "sonner";
+import { Toaster } from "@/components/ui/toaster";
+import Cookies from "js-cookie";
+import axios from "axios";
+import { baseUrl, getUserFromCookie } from "@/Helper/constants";
 
 const MaintenanceBilling = () => {
   const navigate = useNavigate();
@@ -52,6 +56,8 @@ const MaintenanceBilling = () => {
   const [isViewBillOpen, setIsViewBillOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [prod, setProd] = useState<any>([]);
+  const [loader, setLoader] = useState<boolean>(false)
 
   // Get real-time bills data for current resident
   const userBills = useMemo(() => {
@@ -107,9 +113,20 @@ const MaintenanceBilling = () => {
 
   // Redirect if not authenticated
   useEffect(() => {
-    if (!currentResident) {
+    // If we already have a resident in context, nothing to do.
+    if (currentResident) return;
+
+    // If no resident in context, check for a token and decode role to avoid
+    // redirecting logged-in residents on page refresh.
+    const token = Cookies.get("authToken");
+    if (!token) {
       navigate("/resident/auth");
+      return;
     }
+
+
+    // default fallback to resident auth
+    navigate("/resident/auth");
   }, [currentResident, navigate]);
 
   const getBillStatusColor = (status: string) => {
@@ -159,6 +176,36 @@ const MaintenanceBilling = () => {
       return false;
     }
   };
+
+  // Filter and search logic
+
+  let findProvider = async () => {
+    const authToken = Cookies.get("authToken");
+    console.log("authToken:", authToken);
+    let user = await getUserFromCookie()
+    console.log(user, "Awdwadawd")
+    setLoader(true);
+    const response = await axios.get(
+      `${baseUrl}/v1/admin/maintenance/resident/${user.id}`,
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    console.log("response data", response.data);
+    const providers = response.data?.data?.serviceProviders ?? response.data?.data ?? response.data ?? [];
+    setProd(providers);
+
+  };
+
+  console.log("response", prod)
+  useEffect(() => {
+    findProvider()
+  }, [])
+
 
   const handleViewBill = (bill: any) => {
     setSelectedBill(bill);
@@ -383,11 +430,10 @@ const MaintenanceBilling = () => {
                         return (
                           <Card
                             key={bill.id}
-                            className={`border ${
-                              isOverdueBill
-                                ? "border-red-200 bg-red-50"
-                                : "border-gray-200"
-                            }`}
+                            className={`border ${isOverdueBill
+                              ? "border-red-200 bg-red-50"
+                              : "border-gray-200"
+                              }`}
                           >
                             <CardContent className="p-6">
                               <div className="flex items-start justify-between">
@@ -436,11 +482,10 @@ const MaintenanceBilling = () => {
                                         Due Date:
                                       </span>
                                       <span
-                                        className={`ml-2 font-medium ${
-                                          isOverdueBill
-                                            ? "text-red-600"
-                                            : "text-gray-900"
-                                        }`}
+                                        className={`ml-2 font-medium ${isOverdueBill
+                                          ? "text-red-600"
+                                          : "text-gray-900"
+                                          }`}
                                       >
                                         {formatDate(bill.dueDate)}
                                       </span>
