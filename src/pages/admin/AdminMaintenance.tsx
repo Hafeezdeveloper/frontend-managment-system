@@ -60,10 +60,11 @@ interface MaintenanceBill {
   year: number;
   amount: number;
   dueDate: string;
-  status: "Pending" | "Paid" | "Overdue";
+  status: "pending" | "paid" | "overdue";
   generatedDate: string;
   paidDate?: string;
   items: BillItem[];
+  type: string;
 }
 
 interface BillItem {
@@ -116,14 +117,14 @@ const AdminMaintenance = () => {
     const monthName = isNaN(monthNumber)
       ? apiBill.month
       : new Date(2024, monthNumber - 1).toLocaleString("default", {
-          month: "long",
-        });
+        month: "long",
+      });
 
     const mapStatus = (status: string): MaintenanceBill["status"] => {
-      const upper = status.toUpperCase();
-      if (upper === "PAID") return "Paid";
-      if (upper === "OVERDUE") return "Overdue";
-      return "Pending";
+      const upper = status.toLocaleLowerCase()
+      if (upper === "paid") return "paid";
+      if (upper === "overdue") return "overdue";
+      return "pending";
     };
 
     return {
@@ -147,8 +148,9 @@ const AdminMaintenance = () => {
         description: item.description,
         amount: item.amount,
         // Backend doesn't give type, default to Fixed
-        type: "Fixed",
+
       })),
+      type: apiBill.type,
     };
   };
 
@@ -218,7 +220,7 @@ const AdminMaintenance = () => {
   const stats = useMemo(() => {
     const totalBills = filteredBills.length;
     const paidBills = filteredBills.filter(
-      (b) => b.status === "Paid",
+      (b) => b.status === "paid",
     ).length;
     const pendingBills = filteredBills.filter(
       (b) => b.status === "Pending",
@@ -231,7 +233,7 @@ const AdminMaintenance = () => {
       0,
     );
     const collectedAmount = filteredBills
-      .filter((b) => b.status === "Paid")
+      .filter((b) => b.status === "paid")
       .reduce((sum, bill) => sum + bill.amount, 0);
 
     return {
@@ -367,7 +369,7 @@ const AdminMaintenance = () => {
   const handleMarkAsPaid = async (billId: number) => {
     updateMaintenanceBillStatus(billId, "paid");
     const token = getAuthToken();
-    let updateBill  = await axios.put<any>(`${baseUrl}/v1/admin/maintenance/${billId}/status`,   {
+    let updateBill = await axios.put<any>(`${baseUrl}/v1/admin/maintenance/${billId}/status`, {
       status: "paid",
     }, {
       headers: {
@@ -375,10 +377,32 @@ const AdminMaintenance = () => {
         "Content-Type": "application/json",
       },
     });
-  
+
     console.log("updateBill", updateBill)
     if (updateBill?.data?.success) {
       toast.success("Bill marked as paid");
+      findProvider()
+    } else {
+      toast.error(updateBill?.data?.message || "Failed to mark bill as paid");
+    }
+    // toast.success("Bill marked as paid");
+  };
+
+  const handleMarkAsDeclined = async (billId: number) => {
+    const token = getAuthToken();
+    let updateBill = await axios.put<any>(`${baseUrl}/v1/admin/maintenance/${billId}/request-resident-for-declined-bill`, {
+
+    }, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log("updateBill", updateBill)
+    if (updateBill?.data?.success) {
+      toast.success("Bill marked as declined");
+      findProvider()
     } else {
       toast.error(updateBill?.data?.message || "Failed to mark bill as paid");
     }
@@ -413,7 +437,7 @@ const AdminMaintenance = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Paid":
+      case "paid":
         return "bg-green-100 text-green-800";
       case "Pending":
         return "bg-yellow-100 text-yellow-800";
@@ -426,11 +450,11 @@ const AdminMaintenance = () => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "Paid":
+      case "paid":
         return <CheckCircle className="w-4 h-4" />;
-      case "Pending":
+      case "pending":
         return <Clock className="w-4 h-4" />;
-      case "Overdue":
+      case "overdue":
         return <AlertCircle className="w-4 h-4" />;
       default:
         return <Clock className="w-4 h-4" />;
@@ -583,7 +607,7 @@ const AdminMaintenance = () => {
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="paid">paid</SelectItem>
                     <SelectItem value="overdue">Overdue</SelectItem>
                   </SelectContent>
                 </Select>
@@ -606,6 +630,7 @@ const AdminMaintenance = () => {
                     <TableHead>Due Date</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
+                    <TableHead>Request</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -669,21 +694,56 @@ const AdminMaintenance = () => {
                           >
                             <Send className="w-4 h-4" />
                           </Button>
-                          {bill.status !== "Paid" && (
+                          {bill.status !== "paid" && bill?.type !== "request" && (
                             <Button
                               variant="ghost"
                               size="sm"
                               className="text-green-600"
-                              title="Mark as Paid"
-                              onClick={() =>
-                              {
-                                // console.log("biwdawdawdadl l", bill)
+                              title="Mark as paid"
+                              onClick={() => {
+                                console.log("biwdawdawdadl   l", selectedBill)
                                 handleMarkAsPaid(bill._id)
-                              }}  
+                              }}
                             >
                               <CheckCircle className="w-4 h-4" />
                             </Button>
                           )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+
+                        <div className="flex space-x-2">
+                          {bill?.type == "request" && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-white"
+                                style={{ backgroundColor: "darkgreen" }}
+                                title="Mark as paid"
+                                onClick={() => {
+                                  // console.log("biwdawdawdadl   l", bill)
+                                  handleMarkAsPaid(bill._id)
+                                }}
+                              >
+                                <p> Approved </p>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-white"
+                                title="Mark as paid"
+                                style={{ backgroundColor: "darkred" }}
+                                onClick={() => {
+                                  // console.log("biwdawdawdadl   l", bill)
+                                  handleMarkAsDeclined(bill._id)
+                                }}
+                              >
+                                <p> Declined </p>
+                              </Button>
+                            </>
+                          )}
+
                         </div>
                       </TableCell>
                     </TableRow>
@@ -826,7 +886,7 @@ const AdminMaintenance = () => {
                     </div>
                     <div className="w-28">
                       <Select
-                        value={item.type}
+                        value={item?.type}
                         onValueChange={(value) =>
                           updateBillItem(index, "type", value)
                         }
@@ -960,11 +1020,12 @@ const AdminMaintenance = () => {
                   <Download className="w-4 h-4 mr-2" />
                   Download PDF
                 </Button>
-                {selectedBill.status !== "Paid" && (
+                {selectedBill.status !== "paid" && selectedBill?.type !== "request" && (
                   <Button
                     onClick={() => {
-                      handleMarkAsPaid(selectedBill._id);
-                      setIsViewBillOpen(false);
+                      console.log("selectedBill", selectedBill)
+                      // handleMarkAsPaid(selectedBill._id);
+                      // setIsViewBillOpen(false);
                     }}
                     className="bg-green-600 hover:bg-green-700"
                   >

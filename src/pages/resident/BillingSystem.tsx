@@ -57,59 +57,34 @@ const MaintenanceBilling = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [prod, setProd] = useState<any>([]);
-  const [loader, setLoader] = useState<boolean>(false)
+  const [loader, setLoader] = useState<boolean>(false);
+  const [stats, setStats] = useState({
+    totalOutstanding: 0,
+    overdueBills: 0,
+    paidThisMonth: 0,
+    totalBills: 0,
+  });
 
-  // Get real-time bills data for current resident
-  const userBills = useMemo(() => {
-    if (!currentResident) return [];
-    return getResidentBills(currentResident.id);
-  }, [currentResident, getResidentBills]);
+  // Use API data (prod) instead of context data
+  const userBills = prod;
 
   // Filter bills based on search and status
   const filteredBills = useMemo(() => {
-    return userBills.filter((bill) => {
+    return userBills.filter((bill: any) => {
       const matchesSearch =
-        bill.month.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        bill.year.toString().includes(searchTerm) ||
-        bill.amount.toString().includes(searchTerm);
+        bill.month?.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+        bill.year?.toString().includes(searchTerm) ||
+        bill.amount?.toString().includes(searchTerm);
 
       const matchesStatus =
-        statusFilter === "all" || bill.status.toLowerCase() === statusFilter;
+        statusFilter === "all" || bill.status?.toLowerCase() === statusFilter.toLowerCase();
 
       return matchesSearch && matchesStatus;
     });
   }, [userBills, searchTerm, statusFilter]);
 
-  const currentBills = filteredBills.filter((bill) => bill.status !== "Paid");
-  const paidBills = filteredBills.filter((bill) => bill.status === "Paid");
-
-  // Calculate statistics
-  const stats = useMemo(() => {
-    const totalOutstanding = currentBills.reduce(
-      (sum, bill) => sum + bill.amount,
-      0,
-    );
-    const overdueBills = currentBills.filter((bill) => {
-      const dueDate = new Date(bill.dueDate);
-      return dueDate < new Date() && bill.status === "Pending";
-    });
-    const paidThisMonth = paidBills.filter((bill) => {
-      if (!bill.paidDate) return false;
-      const paidDate = new Date(bill.paidDate);
-      const now = new Date();
-      return (
-        paidDate.getMonth() === now.getMonth() &&
-        paidDate.getFullYear() === now.getFullYear()
-      );
-    });
-
-    return {
-      totalOutstanding,
-      overdueBills: overdueBills.length,
-      paidThisMonth: paidThisMonth.length,
-      totalBills: userBills.length,
-    };
-  }, [currentBills, paidBills, userBills]);
+  const currentBills = filteredBills.filter((bill: any) => bill.status?.toLowerCase() !== "paid");
+  const paidBills = filteredBills.filter((bill: any) => bill.status?.toLowerCase() === "paid");
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -180,25 +155,66 @@ const MaintenanceBilling = () => {
   // Filter and search logic
 
   let findProvider = async () => {
-    const authToken = Cookies.get("authToken");
+    const authToken = Cookies.get("authToken") || localStorage.getItem("authToken");
     console.log("authToken:", authToken);
-    let user = await getUserFromCookie()
-    console.log(user, "Awdwadawd")
+    let user: any = await getUserFromCookie()
+    console.log(user, "User data")
+
+    if (!user || !(user as any).id) {
+      toast.error("User not authenticated. Please login again.");
+      setLoader(false);
+      return;
+    }
+
     setLoader(true);
-    const response = await axios.get(
-      `${baseUrl}/v1/admin/maintenance/resident/${user.id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
+    try {
+      const response = await axios.get(
+        `${baseUrl}/v1/admin/maintenance/resident/${(user as any).id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            "Content-Type": "application/json",
+          },
         },
-      },
-    );
+      );
 
-    console.log("response data", response.data);
-    const providers = response.data?.data?.serviceProviders ?? response.data?.data ?? response.data ?? [];
-    setProd(providers);
+      console.log("response data", response.data);
 
+      // Format bills from API to match expected structure
+      const bills = response.data?.data?.bills ?? [];
+      const formattedBills = bills.map((bill: any) => ({
+        id: bill._id,
+        month: bill.month,
+        year: bill.year,
+        amount: bill.amount,
+        dueDate: bill.dueDate,
+        status: bill.status,
+        paidDate: bill.paidDate,
+        items: bill.items || [],
+        generatedDate: bill.generatedDate,
+        createdAt: bill.createdAt,
+        updatedAt: bill.updatedAt,
+        type: bill.type,
+        apartment: currentResident?.apartment || "N/A", // Add apartment from current resident
+      }));
+
+      setProd(formattedBills);
+      console.log("prod" , prod)
+      // Update statistics from API if available
+      if (response.data?.data?.statistics) {
+        setStats({
+          totalOutstanding: response.data.data.statistics.totalOutstanding || 0,
+          overdueBills: response.data.data.statistics.overdueBills || 0,
+          paidThisMonth: response.data.data.statistics.paidThisMonth || 0,
+          totalBills: response.data.data.statistics.totalBills || 0,
+        });
+      }
+    } catch (err: any) {
+      console.error("Error fetching bills:", err);
+      toast.error(err.response?.data?.message || "Failed to fetch bills");
+    } finally {
+      setLoader(false);
+    }
   };
 
   console.log("response", prod)
@@ -211,12 +227,40 @@ const MaintenanceBilling = () => {
     setSelectedBill(bill);
     setIsViewBillOpen(true);
   };
+  const getAuthToken = () => Cookies.get("authToken") || localStorage.getItem("authToken");
+  
+  const handleMarkAsPaid = async (billId: string) => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        toast.error("Authentication required. Please login again.");
+        return;
+      }
 
-  const handleMarkAsPaid = (billId: number) => {
-    updateMaintenanceBillStatus(billId, "Paid");
-    toast.success(
-      "Payment confirmation sent to admin. Bill will be marked as paid once verified.",
-    );
+      const response = await axios.put<any>(
+        `${baseUrl}/v1/admin/maintenance/${billId}/request-resident-for-bill`,
+        {
+          status: "paid"
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (response.data?.success) {
+        toast.success("Payment confirmation sent to admin. Bill will be marked as paid once verified.");
+        // Refresh bills list
+        findProvider();
+      } else {
+        toast.error(response.data?.message || "Failed to send payment request");
+      }
+    } catch (err: any) {
+      console.error("Error marking bill as paid:", err);
+      toast.error(err.response?.data?.message || "Failed to send payment request");
+    }
   };
 
   if (!currentResident) {
@@ -510,14 +554,16 @@ const MaintenanceBilling = () => {
                                     <Eye className="w-4 h-4 mr-1" />
                                     View Details
                                   </Button>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleMarkAsPaid(bill.id)}
-                                    className="bg-green-600 hover:bg-green-700 text-white"
-                                  >
-                                    <Banknote className="w-4 h-4 mr-1" />
-                                    Mark as Paid
-                                  </Button>
+                                  {bill.type !== "request" && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleMarkAsPaid(bill.id)}
+                                      className="bg-green-600 hover:bg-green-700 text-white"
+                                    >
+                                      <Banknote className="w-4 h-4 mr-1" />
+                                      Mark as Paid
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                             </CardContent>
@@ -735,7 +781,7 @@ const MaintenanceBilling = () => {
                   <Download className="w-4 h-4 mr-2" />
                   Download PDF
                 </Button>
-                {selectedBill.status !== "Paid" && (
+                {selectedBill?.status !== "paid" && selectedBill?.type === "request" && (
                   <Button
                     onClick={() => {
                       handleMarkAsPaid(selectedBill.id);
