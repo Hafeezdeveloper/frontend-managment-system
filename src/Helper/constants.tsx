@@ -2,6 +2,8 @@ import { jwtDecode } from "jwt-decode";
 
 // Mock data for departments
 export const baseUrl = "http://192.168.0.107:5000/api"
+// For live 
+// export const baseUrl = "https://backend-managment-sys.vercel.app/api"
 export const Departments = [
   { value: 'cs', name: 'Computer Science' },
   { value: 'ee', name: 'Electrical Engineering' },
