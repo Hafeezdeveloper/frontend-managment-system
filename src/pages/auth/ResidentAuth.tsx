@@ -76,7 +76,7 @@ const ResidentAuth = () => {
     cnicNumber: "",
     passportNumber: "",
     driverLicenseNumber: "",
-    ownershipType: "OWNER" as "OWNER" | "TENANT",
+    ownershipType: "owner" as "owner" | "tenant",
     emergencyContact: "",
     emergencyContactPhone: "",
     occupation: "",
@@ -391,7 +391,7 @@ const ResidentAuth = () => {
             cnicNumber: "",
             passportNumber: "",
             driverLicenseNumber: "",
-            ownershipType: "OWNER",
+            ownershipType: "owner",
             emergencyContact: "",
             emergencyContactPhone: "",
             occupation: "",
@@ -657,8 +657,8 @@ const ResidentAuth = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="OWNER">Owner</SelectItem>
-              <SelectItem value="TENANT">Tenant</SelectItem>
+              <SelectItem value="owner">Owner</SelectItem>
+              <SelectItem value="tenant">Tenant</SelectItem>
             </SelectContent>
           </Select>
         </div>

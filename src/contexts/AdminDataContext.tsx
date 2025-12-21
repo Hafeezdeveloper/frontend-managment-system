@@ -26,7 +26,7 @@ export interface Resident {
   passportNumber?: string;
   driverLicenseNumber?: string;
   idDocumentType: "CNIC" | "Passport" | "Driver License";
-  ownershipType: "Owner" | "Tenant";
+  ownershipType: "owner" | "tenant";
   emergencyContact?: string;
   emergencyContactPhone?: string;
   occupation?: string;

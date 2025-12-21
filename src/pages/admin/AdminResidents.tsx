@@ -265,7 +265,7 @@ const AdminResidents = () => {
       joinDate: new Date().toISOString().split("T")[0],
       approvalStatus: "approved" as const,
       idDocumentType: "CNIC" as const,
-      ownershipType: "Owner" as const,
+      ownershipType: "owner" as const,
     };
 
     addResident(newResident);

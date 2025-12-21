@@ -170,12 +170,7 @@ const AdminLogin = () => {
             </form>
 
             {/* Demo Credentials */}
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
-              <p className="text-sm text-gray-600 font-medium mb-2">
-                Demo Credentials:
-              </p>
-              <p className="text-sm text-gray-500">Password: admin123</p>
-            </div>
+           
           </CardContent>
         </Card>
 
